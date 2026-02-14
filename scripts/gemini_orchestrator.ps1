@@ -45,7 +45,10 @@ param(
   [string]$LogDirectory = '',
 
   [Parameter(HelpMessage = 'PowerShell executable for launching run-agent scripts (auto-detected by default).')]
-  [string]$PowerShellExe = ''
+  [string]$PowerShellExe = '',
+
+  [Parameter(HelpMessage = 'The mission prompt/brief for the Agent Foundry.')]
+  [string]$Prompt = ''
 
 )
 
@@ -57,6 +60,40 @@ $ErrorActionPreference = "Stop"
 
 function Log-Line([string]$Message) {
   Write-GeminiLog -Level INFO -Message $Message
+}
+
+function Run-AgentFoundry([string]$BaseRepo, [string]$MissionPrompt, [string]$TargetRunDir) {
+  if ([string]::IsNullOrWhiteSpace($MissionPrompt)) {
+    Log-Line "Foundry: No mission prompt provided, skipping specialist formulation."
+    return
+  }
+  $foundryScript = Join-Path $BaseRepo "scripts\agent_foundry.py"
+  if (-not (Test-Path -LiteralPath $foundryScript)) {
+    Log-Line "Foundry: Script missing at $foundryScript"
+    return
+  }
+  
+  Log-Line "Foundry: Running check for specialized roles..."
+  # We use the current session's python to run the foundry
+  $res = Invoke-GeminiExternalCommand -FilePath 'python' -ArgumentList @($foundryScript, '--mission', $MissionPrompt, '--run-dir', $TargetRunDir) -WorkingDirectory $BaseRepo -TimeoutSec 300
+  
+  if ($res.ExitCode -eq 0) {
+    foreach ($line in $res.StdOut.Split("`n")) {
+      if ($line -match "MISSION_TEAM: (.*)") {
+        $team = $matches[1].Trim()
+        Log-Line "Foundry: Team formulation: $team"
+        # Optional: write to a file for the dashboard
+        $teamPath = Join-Path $TargetRunDir "mission_team.txt"
+        $team | Set-Content -Path $teamPath -Encoding UTF8
+      }
+      if ($line -match "Foundry: (.*)") {
+        Log-Line $line.Trim()
+      }
+    }
+  } else {
+    Log-Line "Foundry: Failed with exit code $($res.ExitCode)"
+    Log-Line $res.StdErr
+  }
 }
 
 <#
@@ -427,6 +464,7 @@ $resolvedRunDir = Resolve-RunDir -Base $RepoRoot -Requested $RunDir
 $runName = Split-Path $resolvedRunDir -Leaf
 $logDir = if (-not [string]::IsNullOrWhiteSpace($LogDirectory)) { $LogDirectory } else { $resolvedRunDir }
 Initialize-GeminiLogging -LogDirectory $logDir -LogFileName 'triad_orchestrator.log'
+Run-AgentFoundry -BaseRepo $RepoRoot -MissionPrompt $Prompt -TargetRunDir $resolvedRunDir
 $script:PowerShellExeResolved = Resolve-PowerShellExe -Requested $PowerShellExe
 Write-GeminiLog -Level INFO -Message ("powershell_exe={0}" -f $script:PowerShellExeResolved)
 

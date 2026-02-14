@@ -54,7 +54,8 @@ while ($true) {
     try {
         if ($Triad) {
             # Triad Orchestrator handles its own model routing based on config
-            & $ExecPath -RepoRoot $RepoRoot -CouncilPattern debate -EnableCouncilBus
+            & $ExecPath -RepoRoot $RepoRoot -CouncilPattern debate -EnableCouncilBus -Prompt $Prompt
+            $Prompt = $null # Clear after first run
         } else {
                     if ($Prompt) {
             & gemini --yolo --model $Model -p $Prompt
