@@ -67,7 +67,10 @@ def process_chat(repo_root):
             for line in f:
                 line = line.strip()
                 if line:
-                    messages.append(json.loads(line))
+                    try:
+                        messages.append(json.loads(line))
+                    except json.JSONDecodeError as je:
+                        log(f"JSON error in line: {je}")
     except Exception as e:
         log(f"Critical error reading history: {e}")
         return

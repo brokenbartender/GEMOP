@@ -6,6 +6,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path
+from typing import Optional
 try:
     import psutil
 except ImportError:
@@ -21,6 +22,14 @@ ACCOUNTANT = REPO_ROOT / "ramshare" / "skills" / "skill_accountant.py"
 UNIVERSAL_CONTEXT_PATH = REPO_ROOT / "ramshare" / "state" / "universal_context.json"
 LESSONS_PATH = REPO_ROOT / "ramshare" / "learning" / "memory" / "lessons.md"
 TASK_PATH = Path(r"C:\Users\codym\.Gemini\current_task.json")
+
+
+def get_latest_job(repo_root: Path) -> Optional[Path]:
+    jobs_dir = repo_root / ".agent-jobs"
+    if not jobs_dir.exists(): return None
+    subdirs = [d for d in jobs_dir.iterdir() if d.is_dir() and d.name != "latest"]
+    if not subdirs: return None
+    return max(subdirs, key=lambda p: p.stat().st_mtime)
 
 
 def update_universal_context() -> None:
@@ -48,7 +57,21 @@ def update_universal_context() -> None:
         context["system_load"]["cpu"] = psutil.cpu_percent()
         context["system_load"]["ram"] = psutil.virtual_memory().percent
 
-    # 2. Current Task
+    # 2. Current Task & Processing Status
+    context["is_processing"] = False
+    if latest_job := get_latest_job(REPO_ROOT):
+        history_file = latest_job / "state" / "chat_history.jsonl"
+        if history_file.exists():
+            try:
+                lines = history_file.read_text(encoding="utf-8-sig").splitlines()
+                for line in reversed(lines):
+                    if line.strip():
+                        msg = json.loads(line)
+                        if msg.get("role") == "Commander" and not msg.get("processed", False):
+                            context["is_processing"] = True
+                            break
+            except: pass
+
     if TASK_PATH.exists():
         try:
             task_data = json.loads(TASK_PATH.read_text(encoding="utf-8"))

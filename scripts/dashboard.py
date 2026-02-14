@@ -31,9 +31,10 @@ if u_context:
     with st.container():
         c1, c2, c3 = st.columns([2, 3, 1])
         with c1:
-            st.caption(f"🎯 **Current Task:** {u_context.get('current_task', 'Idle')}")
+            task_status = "🧠 **THINKING**" if u_context.get("is_processing") else f"🎯 **Task:** {u_context.get('current_task', 'Idle')}"
+            st.markdown(task_status)
         with c2:
-            st.caption(f"🧠 **Chain of Thought:** {u_context.get('lessons_summary', 'Thinking...')}")
+            st.caption(f"🧠 **Chain of Thought:** {u_context.get('lessons_summary', 'Awaiting context...')}")
         with c3:
             st.caption(f"⚡ **Load:** CPU {u_context.get('system_load', {}).get('cpu', 0)}% | RAM {u_context.get('system_load', {}).get('ram', 0)}%")
     st.divider()
