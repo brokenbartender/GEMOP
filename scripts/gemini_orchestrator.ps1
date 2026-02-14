@@ -325,6 +325,52 @@ function Normalize-RunScriptsForRawGemini([string]$TargetRunDir, [string]$RawPat
   return $changed
 }
 
+function Inject-MirrorContext([string]$BaseRepo, [string]$TargetRunDir) {
+  $lessonsPath = Join-Path $BaseRepo "ramshare\learning\memory\lessons.md"
+  $memorySummary = "No recent tactical memory."
+  if (Test-Path $lessonsPath) {
+    $lines = Get-Content $lessonsPath
+    $lessons = $lines | Where-Object { $_.Trim().StartsWith("- ") }
+    if ($lessons) {
+      $memorySummary = ($lessons | Select-Object -Last 3) -join " | "
+    }
+  }
+
+  $packPath = Join-Path $BaseRepo "agents\packs\triad_autonomous.json"
+  $roles = @("architect", "engineer", "tester") # Fallback
+  if (Test-Path $packPath) {
+    try {
+      $pack = Get-Content $packPath -Raw | ConvertFrom-Json
+      $roles = $pack.roles.role_id
+    } catch {}
+  }
+
+  $prompts = Get-ChildItem $TargetRunDir -File -Filter "prompt*.txt" | Sort-Object Name
+  $i = 0
+  foreach ($p in $prompts) {
+    $role = if ($i -lt $roles.Count) { $roles[$i] } else { "specialist" }
+    $roleFile = Join-Path $BaseRepo "agents\roles\$role.md"
+    $identity = if (Test-Path $roleFile) { Get-Content $roleFile -Raw } else { "You are a specialist agent." }
+    
+    $block = @"
+
+### MIRROR PROTOCOL (Universal Self-Awareness)
+You are $role. 
+Here is your identity file:
+$identity
+
+Here is your recent memory (Tactical Lessons):
+$memorySummary
+"@
+    $text = Get-Content $p.FullName -Raw
+    if ($text -notlike "*### MIRROR PROTOCOL*") {
+      Set-Content -LiteralPath $p.FullName -Value ($text + "`n" + $block) -Encoding UTF8
+      Log-Line "Mirror Protocol injected for $role (prompt$($i+1))"
+    }
+    $i++
+  }
+}
+
 function Test-RunScriptParsing([string]$TargetRunDir) {
   $scripts = Get-ChildItem $TargetRunDir -File -Filter "run-agent*.ps1" | Sort-Object Name
   $failed = @()
@@ -517,6 +563,9 @@ try {
     Log-Line "council protocol contract injected into prompts: changed=$councilPatch"
     Validate-CouncilManifestContract -TargetRunDir $resolvedRunDir
   }
+  
+  Inject-MirrorContext -BaseRepo $RepoRoot -TargetRunDir $resolvedRunDir
+
   $parseFailures = Test-RunScriptParsing -TargetRunDir $resolvedRunDir
   if ($parseFailures.Count -gt 0) {
     throw ("run script parse failures:`n" + ($parseFailures -join "`n"))

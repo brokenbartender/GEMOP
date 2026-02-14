@@ -1,10 +1,15 @@
 import argparse
 import datetime as dt
 import json
+import os
 import subprocess
 import sys
 import time
 from pathlib import Path
+try:
+    import psutil
+except ImportError:
+    psutil = None
 
 
 REPO_ROOT = Path(os.environ.get("GEMINI_OP_REPO_ROOT", Path(__file__).resolve().parent.parent))
@@ -13,6 +18,54 @@ CRASH_LOG = REPO_ROOT / "ramshare" / "evidence" / "crash_log.md"
 KILL_SWITCH = REPO_ROOT / "STOP_ALL_AGENTS.flag"
 DISPATCHER = REPO_ROOT / "scripts" / "GEMINI_dispatcher.py"
 ACCOUNTANT = REPO_ROOT / "ramshare" / "skills" / "skill_accountant.py"
+UNIVERSAL_CONTEXT_PATH = REPO_ROOT / "ramshare" / "state" / "universal_context.json"
+LESSONS_PATH = REPO_ROOT / "ramshare" / "learning" / "memory" / "lessons.md"
+TASK_PATH = Path(r"C:\Users\codym\.Gemini\current_task.json")
+
+
+def update_universal_context() -> None:
+    context = {
+        "ts": dt.datetime.now().isoformat(),
+        "active_pids": [],
+        "current_task": "Unknown",
+        "system_load": {"cpu": 0, "ram": 0},
+        "lessons_summary": "No recent lessons."
+    }
+
+    # 1. Active PIDs (excluding CLI/Shell)
+    if psutil:
+        current_pid = os.getpid()
+        for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
+            try:
+                # Basic filter to find agentic processes
+                cmdline = " ".join(proc.info['cmdline'] or [])
+                if ("gemini" in cmdline or "python" in cmdline) and proc.info['pid'] != current_pid:
+                    if "gemini-heartbeat" not in cmdline and "powershell" not in cmdline:
+                        context["active_pids"].append({"pid": proc.info['pid'], "name": proc.info['name']})
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                continue
+        
+        context["system_load"]["cpu"] = psutil.cpu_percent()
+        context["system_load"]["ram"] = psutil.virtual_memory().percent
+
+    # 2. Current Task
+    if TASK_PATH.exists():
+        try:
+            task_data = json.loads(TASK_PATH.read_text(encoding="utf-8"))
+            context["current_task"] = task_data.get("task", "Idle")
+        except: pass
+
+    # 3. Lessons Learned Summary
+    if LESSONS_PATH.exists():
+        try:
+            lines = LESSONS_PATH.read_text(encoding="utf-8").splitlines()
+            lessons = [l for l in lines if l.strip().startswith("- ")]
+            if lessons:
+                context["lessons_summary"] = " | ".join(lessons[-3:]) # Last 3 lessons
+        except: pass
+
+    UNIVERSAL_CONTEXT_PATH.parent.mkdir(parents=True, exist_ok=True)
+    UNIVERSAL_CONTEXT_PATH.write_text(json.dumps(context, indent=2), encoding="utf-8")
 
 
 def log_crash(message: str) -> None:
@@ -70,6 +123,7 @@ def main() -> None:
 
     while True:
         try:
+            update_universal_context()
             if KILL_SWITCH.exists():
                 print(f"Heartbeat paused: kill switch present at {KILL_SWITCH}")
                 if args.once:

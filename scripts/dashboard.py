@@ -10,6 +10,34 @@ from pathlib import Path
 # --- Configuration & State ---
 st.set_page_config(page_title="Mission Control v2.0", layout="wide", page_icon="💂‍♂️")
 
+def get_repo_root():
+    return Path(os.environ.get("GEMINI_OP_REPO_ROOT", Path(__file__).resolve().parents[1]))
+
+REPO_ROOT = get_repo_root()
+PID_FILE = REPO_ROOT / ".gemini/current_mission.pid"
+UNIVERSAL_CONTEXT_PATH = REPO_ROOT / "ramshare" / "state" / "universal_context.json"
+
+def get_universal_context():
+    if UNIVERSAL_CONTEXT_PATH.exists():
+        try:
+            return json.loads(UNIVERSAL_CONTEXT_PATH.read_text(encoding="utf-8"))
+        except: pass
+    return None
+
+u_context = get_universal_context()
+
+# Global Awareness Bar
+if u_context:
+    with st.container():
+        c1, c2, c3 = st.columns([2, 3, 1])
+        with c1:
+            st.caption(f"🎯 **Current Task:** {u_context.get('current_task', 'Idle')}")
+        with c2:
+            st.caption(f"🧠 **Chain of Thought:** {u_context.get('lessons_summary', 'Thinking...')}")
+        with c3:
+            st.caption(f"⚡ **Load:** CPU {u_context.get('system_load', {}).get('cpu', 0)}% | RAM {u_context.get('system_load', {}).get('ram', 0)}%")
+    st.divider()
+
 # Custom CSS for Mobile-Responsive Executive Review
 st.markdown("""
     <style>
