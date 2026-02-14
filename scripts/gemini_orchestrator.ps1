@@ -48,7 +48,10 @@ param(
   [string]$PowerShellExe = '',
 
   [Parameter(HelpMessage = 'The mission prompt/brief for the Agent Foundry.')]
-  [string]$Prompt = ''
+  [string]$Prompt = '',
+
+  [Parameter(HelpMessage = 'Specific team composition (comma-separated).')]
+  [string]$Team = ''
 
 )
 
@@ -60,6 +63,28 @@ $ErrorActionPreference = "Stop"
 
 function Log-Line([string]$Message) {
   Write-GeminiLog -Level INFO -Message $Message
+}
+
+function Wait-For-TeamManifest([string]$TargetRunDir) {
+  $manifestPath = Join-Path $TargetRunDir "team_manifest.json"
+  Log-Line "Orchestrator: Waiting for team_manifest.json..."
+  $timeout = 60 # 60 seconds timeout
+  $elapsed = 0
+  while (-not (Test-Path $manifestPath) -and $elapsed -lt $timeout) {
+    Start-Sleep -Seconds 2
+    $elapsed += 2
+  }
+  if (Test-Path $manifestPath) {
+    try {
+      $manifest = Get-Content $manifestPath -Raw | ConvertFrom-Json
+      Log-Line "Orchestrator: Team manifest received: $($manifest.team -join ', ')"
+      return $manifest.team
+    } catch {
+      Log-Line "Orchestrator: Failed to parse team_manifest.json"
+    }
+  }
+  Log-Line "Orchestrator: No manifest found, falling back to default triad."
+  return @("architect", "engineer", "tester")
 }
 
 function Run-AgentFoundry([string]$BaseRepo, [string]$MissionPrompt, [string]$TargetRunDir) {
@@ -545,6 +570,10 @@ try {
   Log-Line "run_dir=$resolvedRunDir"
   Log-Line "run_id=$runName"
   Log-Line "raw_GEMINI_path=$RawGeminiPath"
+  
+  $DeputyTeam = if (-not [string]::IsNullOrWhiteSpace($Team)) { $Team.Split(",").Trim() } else { Wait-For-TeamManifest -TargetRunDir $resolvedRunDir }
+  Log-Line "Active Team: $($DeputyTeam -join ', ')"
+
   Log-Line "agents_per_console=$AgentsPerConsole"
   Log-Line "launch_format=$learnedFormat"
 
