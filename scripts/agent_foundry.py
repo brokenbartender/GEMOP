@@ -59,8 +59,9 @@ STRICT RULES:
         temp_prompt.write_text(prompt, encoding="utf-8")
         
         result = subprocess.run(
-            ["gemini", "--model", "gemini-2.0-flash-exp", "-p", prompt],
-            capture_output=True, text=True, encoding="utf-8"
+            ["C:\\nvm4w\\nodejs\\gemini.cmd", "--yolo", "-p", prompt],
+            capture_output=True, text=True, encoding="utf-8",
+            creationflags=subprocess.CREATE_NO_WINDOW
         )
         
         if result.returncode != 0:
