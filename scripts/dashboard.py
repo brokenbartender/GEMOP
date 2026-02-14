@@ -115,7 +115,17 @@ with tab_tactical:
             
             if u_context.get("is_processing"):
                 with st.chat_message("assistant"):
-                    st.write("Chief of Staff is formulating strategy...")
+                    last_msg_text = ""
+                    if history_file.exists():
+                        try:
+                            lines = history_file.read_text(encoding="utf-8-sig").splitlines()
+                            for line in reversed(lines):
+                                m = json.loads(line)
+                                if m.get("role") == "Commander" and not m.get("processed", False):
+                                    last_msg_text = f"Analyzing: *\"{m.get('content')[:100]}...\"*"
+                                    break
+                        except: pass
+                    st.write(f"Chief of Staff is formulating strategy... {last_msg_text}")
                     st.spinner()
 
     with col_gov:

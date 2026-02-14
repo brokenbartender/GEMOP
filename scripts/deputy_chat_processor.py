@@ -234,7 +234,7 @@ def add_response(path, content, role="Deputy"):
 if __name__ == "__main__":
     root = sys.argv[1] if len(sys.argv) > 1 else "."
     enforce_single_instance()
-    log(f"Deputy v3.0 starting at {root}")
+    log(f"Deputy v3.0 (Chief of Staff) starting at {root}")
     while True:
         process_chat(root)
         time.sleep(2)
