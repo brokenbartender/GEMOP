@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Job",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "task_type",
+    "priority",
+    "target_profile",
+    "constraints",
+    "output_format",
+    "inputs",
+    "policy"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Stable job id (kebab-case)."
+    },
+    "task_type": {
+      "type": "string",
+      "description": "What kind of job this is (e.g., trend_spotter, review_miner)."
+    },
+    "priority": {
+      "type": "string",
+      "enum": ["P0", "P1", "P2"]
+    },
+    "target_profile": {
+      "type": "string",
+      "description": "Gemini profile to use (research vs ops).",
+      "enum": ["research", "ops"]
+    },
+    "constraints": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["max_runtime_seconds"],
+      "properties": {
+        "max_runtime_seconds": { "type": "integer", "minimum": 1 },
+        "allowed_domains": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": []
+        },
+        "notes": { "type": "string", "default": "" }
+      }
+    },
+    "output_format": {
+      "type": "string",
+      "enum": ["agent_report_md"]
+    },
+    "inputs": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["estimated_spend_usd", "risk"],
+      "properties": {
+        "risk": { "type": "string", "enum": ["low", "medium", "high"] },
+        "estimated_spend_usd": { "type": "number", "minimum": 0 },
+        "requires_human_approval": { "type": "boolean", "default": false }
+      }
+    }
+  }
+}
+

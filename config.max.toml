@@ -1,0 +1,67 @@
+ask_for_approval = "never"
+sandbox = "workspace-write"
+model = "gpt-5.2-Gemini"
+personality = "pragmatic"
+
+[features]
+powershell_utf8 = true
+unified_exec = true
+shell_snapshot = true
+
+[mcp_servers.openaiDeveloperDocs]
+startup_timeout_sec = 60
+url = "https://developers.openai.com/mcp"
+
+[mcp_servers.filesystem]
+startup_timeout_sec = 60
+command = "npx"
+args = ["-y", "@modelcontextprotocol/server-filesystem", 'C:\Users\codym\.Gemini']
+
+[mcp_servers.chrome-devtools]
+startup_timeout_sec = 60
+command = "npx"
+args = ["-y", "chrome-devtools-mcp"]
+
+[mcp_servers.playwright]
+startup_timeout_sec = 60
+command = "npx"
+args = ["-y", "@modelcontextprotocol/server-playwright"]
+
+[mcp_servers.browser-use]
+startup_timeout_sec = 60
+command = "npx"
+args = ["-y", "@co-browser/browser-use-mcp-server"]
+
+[mcp_servers.memory]
+startup_timeout_sec = 60
+command = "npx"
+args = ["-y", "@modelcontextprotocol/server-memory"]
+
+[mcp_servers.fetch]
+startup_timeout_sec = 60
+command = "npx"
+args = ["-y", "@modelcontextprotocol/server-fetch"]
+
+[mcp_servers.git]
+startup_timeout_sec = 60
+command = "npx"
+args = ["-y", "@modelcontextprotocol/server-git"]
+
+[mcp_servers.github]
+startup_timeout_sec = 60
+command = "npx"
+args = ["-y", "@modelcontextprotocol/server-github"]
+
+[mcp_servers.notion]
+startup_timeout_sec = 60
+url = "https://mcp.notion.com/mcp"
+
+[mcp_servers.shell-exec]
+startup_timeout_sec = 60
+command = "npx"
+args = ["-y", "@modelcontextprotocol/server-shell"]
+
+[mcp_servers.time]
+startup_timeout_sec = 60
+command = "npx"
+args = ["-y", "@modelcontextprotocol/server-time"]

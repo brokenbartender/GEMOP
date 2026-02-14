@@ -1,0 +1,47 @@
+# Profile: fidelity (Tier 5 - brokerage/browser automation)
+#
+# Dedicated profile for Fidelity browser automation and market-analysis execution.
+# Keep spend/trade actions gated via scripts/gemini_governance.py and skill_accountant.py.
+
+[mcp_servers.openaiDeveloperDocs]
+startup_timeout_sec = 10
+url = "https://developers.openai.com/mcp"
+
+[mcp_servers.policy-proxy]
+startup_timeout_sec = 10
+command = "C:\\gemini\\.venv\\Scripts\\python.exe"
+args = ["C:\\gemini\\mcp\\policy_proxy\\server.py"]
+
+
+[mcp_servers.time]
+startup_timeout_sec = 10
+command = "C:\\gemini\\.venv\\Scripts\\python.exe"
+args = ["-m", "mcp_server_time.server"]
+
+[mcp_servers.playwright]
+startup_timeout_sec = 5
+url = "http://localhost:8931/mcp"
+
+[mcp_servers.chrome-devtools]
+startup_timeout_sec = 60
+command = "npx"
+args = ["-y", "chrome-devtools-mcp"]
+
+[mcp_servers.scheduler]
+startup_timeout_sec = 10
+command = "C:\\gemini\\.venv\\Scripts\\python.exe"
+args = ["C:\\gemini\\mcp\\scheduler\\server.py"]
+
+[mcp_servers.notify]
+startup_timeout_sec = 10
+command = "C:\\gemini\\.venv\\Scripts\\python.exe"
+args = ["C:\\gemini\\mcp\\notify\\server.py"]
+
+[mcp_servers.memory]
+startup_timeout_sec = 5
+url = "http://localhost:3013/mcp"
+
+[mcp_servers.system-info]
+startup_timeout_sec = 10
+command = "C:\\gemini\\.venv\\Scripts\\python.exe"
+args = ["-m", "system_info_mcp.server"]

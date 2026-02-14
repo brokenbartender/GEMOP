@@ -1,0 +1,121 @@
+{
+  "pdf": [
+    {
+      "id": "bishop-prml-2006",
+      "url": "https://www.microsoft.com/en-us/research/uploads/prod/2006/01/Bishop-Pattern-Recognition-and-Machine-Learning-2006.pdf",
+      "out": "pdf/bishop-prml-2006.pdf",
+      "notes": "Reputable source (Microsoft Research)."
+    },
+    {
+      "id": "aws-cost-management-best-practices",
+      "url": "https://docs.aws.amazon.com/whitepapers/latest/aws-cost-management-best-practices/aws-cost-management-best-practices.pdf",
+      "out": "pdf/aws-cost-management-best-practices.pdf"
+    },
+    {
+      "id": "nist-sp-800-128",
+      "url": "https://nvlpubs.nist.gov/nistpubs/SpecialPublications/NIST.SP.800-128.pdf",
+      "out": "pdf/nist-sp-800-128.pdf"
+    },
+    {
+      "id": "nist-sp-800-161r1",
+      "url": "https://nvlpubs.nist.gov/nistpubs/SpecialPublications/NIST.SP.800-161r1.pdf",
+      "out": "pdf/nist-sp-800-161r1.pdf"
+    },
+    {
+      "id": "nist-sp-800-92",
+      "url": "https://nvlpubs.nist.gov/nistpubs/Legacy/SP/nistspecialpublication800-92.pdf",
+      "out": "pdf/nist-sp-800-92.pdf"
+    },
+    {
+      "id": "nist-sp-800-190",
+      "url": "https://nvlpubs.nist.gov/nistpubs/SpecialPublications/NIST.SP.800-190.pdf",
+      "out": "pdf/nist-sp-800-190.pdf"
+    }
+  ],
+  "html": [
+    { "id": "deeplearningbook", "url": "https://www.deeplearningbook.org/", "out": "web/deeplearningbook.html" },
+    { "id": "aima", "url": "https://aima.cs.berkeley.edu/", "out": "web/aima.html" },
+    { "id": "d2l", "url": "https://d2l.ai/", "out": "web/d2l.html" },
+    { "id": "artint3e", "url": "https://artint.info/3e/html/ArtInt3e.html", "out": "web/artint3e.html" },
+    { "id": "probml-book1", "url": "https://probml.github.io/pml-book/book1.html", "out": "web/probml-book1.html" },
+    { "id": "understanding-ml", "url": "https://www.cs.huji.ac.il/~shais/UnderstandingMachineLearning/", "out": "web/understanding-ml.html" },
+    { "id": "mml-book", "url": "https://mml-book.github.io/", "out": "web/mml-book.html" },
+
+    { "id": "finops-framework", "url": "https://www.finops.org/framework/", "out": "web/finops-framework.html" },
+    { "id": "focus-spec", "url": "https://focus.finops.org/", "out": "web/focus-spec.html" },
+    { "id": "gcp-cost-optimization", "url": "https://cloud.google.com/docs/cost-optimization", "out": "web/gcp-cost-optimization.html" },
+    { "id": "azure-cost-mgmt", "url": "https://learn.microsoft.com/en-us/azure/cost-management-billing/", "out": "web/azure-cost-mgmt.html" },
+    { "id": "kubecost-docs", "url": "https://docs.kubecost.com/", "out": "web/kubecost-docs.html" },
+    { "id": "infracost-docs", "url": "https://www.infracost.io/docs/", "out": "web/infracost-docs.html" },
+    { "id": "hpbn", "url": "https://hpbn.co/", "out": "web/hpbn.html" },
+    { "id": "sre-efficiency", "url": "https://sre.google/sre-book/efficiency-and-performance/", "out": "web/sre-efficiency-and-performance.html" },
+
+    { "id": "12factor-config", "url": "https://12factor.net/config", "out": "web/12factor-config.html" },
+    { "id": "ansible-best-practices", "url": "https://docs.ansible.com/ansible/latest/tips_tricks/ansible_tips_tricks.html", "out": "web/ansible-best-practices.html" },
+    { "id": "terraform-mod-structure", "url": "https://developer.hashicorp.com/terraform/language/modules/develop/structure", "out": "web/terraform-module-structure.html" },
+    { "id": "dotenv-spec", "url": "https://github.com/motdotla/dotenv", "out": "web/dotenv-spec.html" },
+    { "id": "k8s-configmaps", "url": "https://kubernetes.io/docs/concepts/configuration/configmap/", "out": "web/k8s-configmaps.html" },
+    { "id": "progit-config", "url": "https://git-scm.com/book/en/v2/Customizing-Git-Git-Configuration", "out": "web/progit-config.html" },
+    { "id": "pydantic-settings", "url": "https://docs.pydantic.dev/latest/concepts/pydantic_settings/", "out": "web/pydantic-settings.html" },
+
+    { "id": "docker-get-started", "url": "https://docs.docker.com/get-started/", "out": "web/docker-get-started.html" },
+    { "id": "posix-standard", "url": "https://pubs.opengroup.org/onlinepubs/9699919799/", "out": "web/posix-standard.html" },
+    { "id": "python-tool-recs", "url": "https://packaging.python.org/en/latest/guides/tool-recommendations/", "out": "web/python-tool-recs.html" },
+    { "id": "node-file-descriptors", "url": "https://nodejs.org/en/learn/manipulating-files/working-with-file-descriptors", "out": "web/node-file-descriptors.html" },
+    { "id": "wsl-docs", "url": "https://learn.microsoft.com/en-us/windows/wsl/", "out": "web/wsl.html" },
+    { "id": "go-install", "url": "https://go.dev/doc/install", "out": "web/go-install.html" },
+    { "id": "cordova-overview", "url": "https://cordova.apache.org/docs/en/latest/guide/overview/", "out": "web/cordova-overview.html" },
+
+    { "id": "slsa", "url": "https://slsa.dev/spec/v1.0/about", "out": "web/slsa.html" },
+    { "id": "owasp-dependency-check", "url": "https://owasp.org/www-project-dependency-check/", "out": "web/owasp-dependency-check.html" },
+    { "id": "cyclonedx-1-5", "url": "https://cyclonedx.org/docs/1.5/", "out": "web/cyclonedx-1-5.html" },
+    { "id": "gcp-supply-chain", "url": "https://cloud.google.com/software-supply-chain-security/docs/introduction", "out": "web/gcp-supply-chain.html" },
+    { "id": "poetry-deps", "url": "https://python-poetry.org/docs/dependency-specification/", "out": "web/poetry-dependency-spec.html" },
+    { "id": "npm-package-lock", "url": "https://docs.npmjs.com/cli/v9/configuring-npm/package-lock-json", "out": "web/npm-package-lock.html" },
+    { "id": "chainguard-edu", "url": "https://www.chainguard.dev/edu", "out": "web/chainguard-edu.html" },
+
+    { "id": "otel-concepts", "url": "https://opentelemetry.io/docs/concepts/", "out": "web/otel-concepts.html" },
+    { "id": "honeycomb-oe", "url": "https://www.honeycomb.io/observability-engineering-book", "out": "web/honeycomb-observability-engineering.html" },
+    { "id": "elastic-guide", "url": "https://www.elastic.co/guide/index.html", "out": "web/elastic-guide.html" },
+    { "id": "prometheus-overview", "url": "https://prometheus.io/docs/introduction/overview/", "out": "web/prometheus-overview.html" },
+
+    { "id": "testing-goat", "url": "https://www.obeythetestinggoat.com/", "out": "web/testing-goat.html" },
+    { "id": "selenium-docs", "url": "https://www.selenium.dev/documentation/", "out": "web/selenium.html" },
+    { "id": "pytest-docs", "url": "https://docs.pytest.org/en/7.4.x/", "out": "web/pytest.html" },
+
+    { "id": "semver", "url": "https://semver.org/", "out": "web/semver.html" },
+    { "id": "github-actions", "url": "https://docs.github.com/en/actions", "out": "web/github-actions.html" },
+    { "id": "continuous-delivery", "url": "https://continuousdelivery.com/", "out": "web/continuous-delivery.html" },
+
+    { "id": "google-doc-style", "url": "https://developers.google.com/style", "out": "web/google-doc-style.html" },
+    { "id": "sphinx-docs", "url": "https://www.sphinx-doc.org/en/master/usage/index.html", "out": "web/sphinx.html" },
+    { "id": "nist-threat-modeling-800-154", "url": "https://nvlpubs.nist.gov/nistpubs/SpecialPublications/NIST.SP.800-154.pdf", "out": "web/nist-sp-800-154.html", "notes": "This is a PDF; if snapshot fails, add it to pdf list." },
+    { "id": "write-the-docs", "url": "https://www.writethedocs.org/guide/", "out": "web/write-the-docs.html" },
+
+    { "id": "chroma", "url": "https://docs.trychroma.com/getting-started", "out": "web/chroma.html" },
+    { "id": "milvus", "url": "https://milvus.io/docs/overview.md", "out": "web/milvus.html" },
+    { "id": "weaviate", "url": "https://weaviate.io/developers/weaviate", "out": "web/weaviate.html" },
+    { "id": "pinecone", "url": "https://docs.pinecone.io/docs/overview", "out": "web/pinecone.html" },
+
+    { "id": "nvidia-agentic-sandboxing", "url": "https://developer.nvidia.com/blog/practical-security-guidance-for-sandboxing-agentic-workflows-and-managing-execution-risk/", "out": "web/nvidia-agentic-sandboxing.html" },
+    { "id": "opa-rego", "url": "https://www.openpolicyagent.org/docs/latest/policy-language/", "out": "web/opa-rego.html" },
+    { "id": "nist-ai-rmf", "url": "https://www.nist.gov/itl/ai-risk-management-framework", "out": "web/nist-ai-rmf.html" },
+    { "id": "opa-gatekeeper-concepts", "url": "https://open-policy-agent.github.io/gatekeeper/website/docs/concepts/", "out": "web/opa-gatekeeper.html" },
+
+    { "id": "json-schema", "url": "https://json-schema.org/learn/getting-started-step-by-step", "out": "web/json-schema.html" },
+    { "id": "openapi", "url": "https://swagger.io/docs/specification/about/", "out": "web/openapi.html" },
+    { "id": "oauth2-simplified", "url": "https://oauth.net/2/", "out": "web/oauth2.html" },
+
+    { "id": "progit", "url": "https://git-scm.com/book/en/v2", "out": "web/progit.html" },
+    { "id": "12factor-codebase", "url": "https://12factor.net/codebase", "out": "web/12factor-codebase.html" },
+    { "id": "github-gitignore", "url": "https://github.com/github/gitignore", "out": "web/github-gitignore.html" }
+  ],
+  "record_only": [
+    {
+      "id": "neural-network-mirror",
+      "url": "http://103.203.175.90:81/fdScript/RootOfEBooks/E%20Book%20collection%20-%202024%20-%20G/CSE%20%20IT%20AIDS%20ML/Neural%20Network.pdf",
+      "notes": "Unverified mirror. Do not auto-fetch."
+    }
+  ]
+}
+

@@ -1,0 +1,10 @@
+# Profile: default (Tier 1)
+[mcp_servers.policy-proxy]
+startup_timeout_sec = 10
+command = "C:\\gemini\\.venv\\Scripts\\python.exe"
+args = ["C:\\gemini\\mcp\\policy_proxy\\server.py"]
+
+[mcp_servers.time]
+startup_timeout_sec = 10
+command = "C:\\gemini\\.venv\\Scripts\\python.exe"
+args = ["-m", "mcp_server_time.server"]

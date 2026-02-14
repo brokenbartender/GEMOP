@@ -1,0 +1,18 @@
+<type>: <summary>
+
+Context:
+- <what changed and why>
+
+Other-Computer:
+- <exact steps to run on laptop/second machine>
+- <verify commands and expected output>
+
+Need-From-Other-Computer:
+- hostname
+- active IPv4 address
+- sshd status (Running/Stopped)
+- repo path on disk
+- command output/errors if a step failed
+
+Validation:
+- <tests/checks run locally>

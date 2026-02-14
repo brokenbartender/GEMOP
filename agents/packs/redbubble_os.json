@@ -1,0 +1,39 @@
+{
+  "pack_id": "redbubble_os",
+  "version": "1.0.0",
+  "description": "4-role workflow to define a Redbubble niche strategy, SEO/compliance, art direction/QA, and operating system for manual uploads.",
+  "shared_header_templates": [
+    "agents/templates/shared_constraints.md",
+    "agents/templates/redbubble_os_context.md"
+  ],
+  "defaults": {
+    "raw_gemini_path": "gemini"
+  },
+  "roles": [
+    {
+      "role_id": "strategy_niche_scout",
+      "template": "agents/roles/redbubble_os_strategy_niche_scout.md"
+    },
+    {
+      "role_id": "seo_compliance",
+      "template": "agents/roles/redbubble_os_seo_compliance.md"
+    },
+    {
+      "role_id": "art_direction_qa",
+      "template": "agents/roles/redbubble_os_art_direction_qa.md"
+    },
+    {
+      "role_id": "operating_system",
+      "template": "agents/roles/redbubble_os_operating_system.md"
+    }
+  ],
+  "routing_hints": {
+    "preferred_profile": "default",
+    "tool_allowlist_hints": ["filesystem", "shell"]
+  },
+  "output_layout": {
+    "out_dir": ".agent-jobs/{{RUN_ID}}/out",
+    "shared_dir": ".agent-jobs/{{RUN_ID}}/out/shared",
+    "per_role_dir": ".agent-jobs/{{RUN_ID}}/out/{{ROLE_ID}}"
+  }
+}

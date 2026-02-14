@@ -1,0 +1,81 @@
+# Gemini Inventory
+
+## Path Catalog
+- C:\Users\codym\.Gemini (Gemini global config, skills, scripts)
+- C:\Users\codym\Gemini-smart.cmd (smart launcher)
+- C:\Users\codym\Gemini-boost.cmd (fast launcher)
+- C:\Users\codym\Gemini-boost-lite.cmd (lite launcher)
+- C:\Users\codym\Gemini-run.cmd (runs PowerShell wrapper)
+- C:\Users\codym\Gemini-audit.cmd (preset audit)
+- C:\Users\codym\Gemini-safe.cmd (safe mode launcher)
+- C:\Users\codym\agentic-console (local app + tools + MCP adapters)
+- C:\Users\codym\agentic-control-plane (control plane)
+- C:\Users\codym\agentic-hive (agent swarm tools)
+- C:\Users\codym\AgentTools (custom tooling)
+- C:\Users\codym\ui-automation (UI automation helpers)
+- C:\Users\codym\mcp (local MCP utilities)
+- C:\Users\codym\.mcp-auth (MCP auth)
+- C:\Users\codym\.mcp-insomnia (MCP auth cache)
+- C:\Users\codym\.next-devtools-mcp (MCP data)
+- C:\Users\codym\.strava-mcp (MCP data)
+- C:\Users\codym\GEMINI_broker (broker/relay)
+- C:\Users\codym\Gemini-control-stack (control stack)
+- C:\Users\codym\Enterprise (main app)
+- C:\Users\codym\Enterprise-ref (reference app)
+- C:\Users\codym\LexiProApp-MARKET-READY (legal app)
+- C:\Users\codym\lexipro_audit (audit workspace)
+- C:\Users\codym\Legal_Systems_Architecture_Golden (architecture docs)
+- C:\Users\codym\CaseCompanion (legal companion project)
+
+## Keyword Hints
+- mcp: legal => openaiDeveloperDocs, web-search
+- mcp: statute => web-search
+- mcp: case law => web-search
+- mcp: policy => web-search
+- mcp: browser => playwright, browser-use, chrome-devtools
+- mcp: research => web-search, brave-search
+- mcp: repo => github, git
+- skill: legal => legal-dev, explain-law
+- skill: contract => legal-dev, explain-law
+- skill: eviction => legal-dev, explain-law
+- skill: compliance => legal-dev, explain-law
+- skill: design => figma, figma-implement-design
+- skill: docs => doc, pdf
+- skill: data => spreadsheet
+- skill: audio => speech, transcribe
+
+## Skills
+- atlas
+- build-things
+- cloudflare-deploy
+- develop-web-game
+- doc
+- figma
+- figma-implement-design
+- gh-address-comments
+- gh-fix-ci
+- imagegen
+- jupyter-notebook
+- linear
+- netlify-deploy
+- notion-knowledge-capture
+- notion-meeting-intelligence
+- notion-research-documentation
+- notion-spec-to-implementation
+- openai-docs
+- pdf
+- playwright
+- render-deploy
+- screenshot
+- security-best-practices
+- security-ownership-map
+- security-threat-model
+- sentry
+- skill-creator
+- skill-installer
+- sora
+- speech
+- spreadsheet
+- transcribe
+- vercel-deploy
+- yeet

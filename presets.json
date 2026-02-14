@@ -1,0 +1,221 @@
+{
+  "globals": {
+    "mcps": [
+      "openaiDeveloperDocs"
+    ],
+    "skills": []
+  },
+  "presets": {
+    "legal-only": {
+      "mcps": [
+        "openaiDeveloperDocs",
+        "web-search"
+      ],
+      "skills": [
+        "legal-dev",
+        "explain-law"
+      ]
+    },
+    "core-dev": {
+      "mcps": [
+        "filesystem",
+        "shell",
+        "shell-exec",
+        "git"
+      ],
+      "skills": []
+    },
+    "github-work": {
+      "mcps": [
+        "git",
+        "github",
+        "filesystem",
+        "shell"
+      ],
+      "skills": [
+        "gh-address-comments",
+        "gh-fix-ci"
+      ]
+    },
+    "ui-testing": {
+      "mcps": [
+        "playwright",
+        "browser-use",
+        "chrome-devtools"
+      ],
+      "skills": [
+        "playwright",
+        "screenshot"
+      ]
+    },
+    "docs-research": {
+      "mcps": [
+        "openaiDeveloperDocs",
+        "web-search",
+        "brave-search"
+      ],
+      "skills": [
+        "openai-docs"
+      ]
+    },
+    "app-debug-local": {
+      "mcps": [
+        "filesystem",
+        "shell",
+        "docker",
+        "postgres",
+        "sqlite"
+      ],
+      "skills": [
+        "sentry",
+        "spreadsheet"
+      ]
+    },
+    "data-files": {
+      "mcps": [
+        "filesystem",
+        "sqlite",
+        "postgres"
+      ],
+      "skills": [
+        "spreadsheet",
+        "pdf",
+        "doc",
+        "transcribe"
+      ]
+    },
+    "media-content": {
+      "mcps": [],
+      "skills": [
+        "imagegen",
+        "speech",
+        "sora"
+      ]
+    },
+    "product-design": {
+      "mcps": [
+        "figma",
+        "browser-use"
+      ],
+      "skills": [
+        "figma",
+        "figma-implement-design"
+      ]
+    },
+    "cloud-deploy": {
+      "mcps": [
+        "cloudflare",
+        "vercel",
+        "netlify"
+      ],
+      "skills": [
+        "cloudflare-deploy",
+        "vercel-deploy",
+        "netlify-deploy"
+      ]
+    },
+    "security-review": {
+      "mcps": [
+        "filesystem",
+        "shell",
+        "git"
+      ],
+      "skills": [
+        "security-best-practices",
+        "security-threat-model",
+        "security-ownership-map"
+      ]
+    },
+    "lexipro-qa": {
+      "mcps": [
+        "playwright",
+        "browser-use",
+        "chrome-devtools",
+        "filesystem",
+        "shell"
+      ],
+      "skills": [
+        "playwright",
+        "screenshot"
+      ]
+    },
+    "legal-build": {
+      "mcps": [
+        "filesystem",
+        "shell",
+        "git"
+      ],
+      "skills": [
+        "legal-dev"
+      ]
+    },
+    "ultimate-min-keys": {
+      "mcps": [
+        "filesystem",
+        "shell",
+        "shell-exec",
+        "git",
+        "browser-use",
+        "playwright",
+        "chrome-devtools",
+        "fetch",
+        "memory"
+      ],
+      "skills": [
+        "playwright",
+        "screenshot",
+        "pdf",
+        "doc",
+        "spreadsheet"
+      ]
+    }
+  },
+  "task_rules": {
+    "github": "github-work",
+    "pull request": "github-work",
+    "pr": "github-work",
+    "review": "github-work",
+    "ui": "ui-testing",
+    "browser": "ui-testing",
+    "playwright": "ui-testing",
+    "e2e": "ui-testing",
+    "docs": "docs-research",
+    "documentation": "docs-research",
+    "openai": "docs-research",
+    "research": "docs-research",
+    "debug": "app-debug-local",
+    "docker": "app-debug-local",
+    "database": "app-debug-local",
+    "data": "data-files",
+    "pdf": "data-files",
+    "spreadsheet": "data-files",
+    "image": "media-content",
+    "audio": "media-content",
+    "video": "media-content",
+    "figma": "product-design",
+    "design": "product-design",
+    "deploy": "cloud-deploy",
+    "cloud": "cloud-deploy",
+    "security": "security-review",
+    "threat model": "security-review",
+    "lexipro": "lexipro-qa",
+    "qa": "lexipro-qa",
+    "walkthrough": "lexipro-qa",
+    "module walkthrough": "lexipro-qa",
+    "route walkthrough": "lexipro-qa",
+    "legal": "legal-build",
+    "compliance": "legal-build",
+    "contract": "legal-build",
+    "audit": "legal-build",
+    "statute": "legal-only",
+    "case law": "legal-only",
+    "policy": "legal-only"
+  },
+  "project_rules": {
+    "C:\\Users\\codym\\Enterprise": "legal-build",
+    "C:\\Users\\codym\\Enterprise-ref": "legal-build",
+    "C:\\Users\\codym\\LexiProApp-MARKET-READY": "legal-build",
+    "C:\\Users\\codym\\lexipro_audit": "legal-only",
+    "C:\\Users\\codym\\CaseCompanion": "legal-build"
+  }
+}

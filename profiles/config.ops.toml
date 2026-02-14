@@ -1,0 +1,63 @@
+# Profile: ops (Tier 5 - write/spend capable)
+#
+# This profile is intentionally the only profile that includes high-risk tool access.
+# Use it sparingly and pair it with scripts/gemini_governance.py gates for spend/post actions.
+
+[mcp_servers.openaiDeveloperDocs]
+startup_timeout_sec = 10
+url = "https://developers.openai.com/mcp"
+
+[mcp_servers.policy-proxy]
+startup_timeout_sec = 10
+command = "C:\\gemini\\.venv\\Scripts\\python.exe"
+args = ["C:\\gemini\\mcp\\policy_proxy\\server.py"]
+
+[mcp_servers.git]
+startup_timeout_sec = 10
+command = "C:\\gemini\\.venv\\Scripts\\python.exe"
+args = ["-m", "mcp_server_git.server"]
+
+[mcp_servers.github]
+startup_timeout_sec = 30
+command = "npx"
+args = ["-y", "@modelcontextprotocol/server-github"]
+
+
+[mcp_servers.time]
+startup_timeout_sec = 10
+command = "C:\\gemini\\.venv\\Scripts\\python.exe"
+args = ["-m", "mcp_server_time.server"]
+
+[mcp_servers.container]
+startup_timeout_sec = 60
+command = "npx"
+args = ["-y", "docker-mcp-server"]
+
+[mcp_servers.secrets-vault]
+startup_timeout_sec = 10
+command = "C:\\gemini\\.venv\\Scripts\\python.exe"
+args = ["C:\\gemini\\mcp\\secrets_vault\\server.py"]
+
+[mcp_servers.notify]
+startup_timeout_sec = 10
+command = "C:\\gemini\\.venv\\Scripts\\python.exe"
+args = ["C:\\gemini\\mcp\\notify\\server.py"]
+
+[mcp_servers.scheduler]
+startup_timeout_sec = 10
+command = "C:\\gemini\\.venv\\Scripts\\python.exe"
+args = ["C:\\gemini\\mcp\\scheduler\\server.py"]
+
+[mcp_servers.file-watcher]
+startup_timeout_sec = 10
+command = "C:\\gemini\\.venv\\Scripts\\python.exe"
+args = ["C:\\gemini\\mcp\\file_watcher\\server.py"]
+
+[mcp_servers.system-info]
+startup_timeout_sec = 10
+command = "C:\\gemini\\.venv\\Scripts\\python.exe"
+args = ["-m", "system_info_mcp.server"]
+
+[mcp_servers.memory]
+startup_timeout_sec = 5
+url = "http://localhost:3013/mcp"

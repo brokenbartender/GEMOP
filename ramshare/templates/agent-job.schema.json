@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "AgentJob",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "name",
+    "profile",
+    "schedule",
+    "inputs",
+    "outputs",
+    "policy"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Stable identifier (kebab-case)."
+    },
+    "name": {
+      "type": "string"
+    },
+    "profile": {
+      "type": "string",
+      "description": "Gemini profile to use (e.g., research, ops)."
+    },
+    "schedule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["manual", "interval_minutes", "cron"]
+        },
+        "minutes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "cron": {
+          "type": "string"
+        }
+      }
+    },
+    "inputs": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Arbitrary job inputs (queries, URLs, paths, etc.)."
+    },
+    "outputs": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Declared output paths (report files, evidence artifacts)."
+    },
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["risk", "max_estimated_spend_usd"],
+      "properties": {
+        "risk": {
+          "type": "string",
+          "enum": ["low", "medium", "high"]
+        },
+        "max_estimated_spend_usd": {
+          "type": "number",
+          "minimum": 0
+        },
+        "requires_human_approval": {
+          "type": "boolean",
+          "default": false
+        }
+      }
+    }
+  }
+}
+

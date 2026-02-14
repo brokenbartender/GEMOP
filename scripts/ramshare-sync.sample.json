@@ -1,0 +1,13 @@
+{
+  "enabled": true,
+  "ssh_host": "Gemini-laptop",
+  "local_ramshare_root": "C:\\Gemini\\ramshare",
+  "remote_ramshare_root": "~/Gemini-op/ramshare",
+  "include_paths": [
+    "state",
+    "strategy",
+    "evidence"
+  ],
+  "sync_interval_minutes": 5
+}
+

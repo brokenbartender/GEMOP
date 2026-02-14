@@ -1,0 +1,81 @@
+# Audit Log (Local)
+
+- 2026-02-10T21:41:02-05:00 [HIGH] dispatch job daily-trend-spotter | type=trend_spotter profile=research est_spend=$0.00
+- 2026-02-10T21:45:33-05:00 [HIGH] dispatch job phase5-trend-spotter | type=trend_spotter profile=research est_spend=$0.00
+- 2026-02-10T21:50:34-05:00 [HIGH] dispatch job phase6-product-drafter | type=product_drafter profile=research est_spend=$0.00
+- 2026-02-10T21:50:49-05:00 [HIGH] dispatch job phase6-product-drafter | type=product_drafter profile=research est_spend=$0.00
+- 2026-02-10T21:53:46-05:00 [HIGH] dispatch job run-manager-phase7 | type=manager profile=research est_spend=$0.00
+- 2026-02-10T21:53:46-05:00 [MANAGER] Promoted trend 'Retro Camping Aesthetic Gifts' to Draft Job
+- 2026-02-10T21:57:00-05:00 [HIGH] dispatch job auto-draft-20260210_215346 | type=product_drafter profile=research est_spend=$0.00
+- 2026-02-10T21:57:00-05:00 [HIGH] dispatch job run-manager-phase8 | type=manager profile=research est_spend=$0.00
+- 2026-02-10T21:57:00-05:00 [MANAGER] Promoted trend 'Retro Neon Cats' to Draft Job
+- 2026-02-10T21:57:00-05:00 [MANAGER] Promoted Draft 'Retro Sci-Fi Tee' to Listing Job
+- 2026-02-10T21:57:19-05:00 [HIGH] dispatch job auto-draft-20260210_215700 | type=product_drafter profile=research est_spend=$0.00
+- 2026-02-10T21:57:19-05:00 [HIGH] dispatch job auto-listing-20260210_215700 | type=listing_generator profile=research est_spend=$0.00
+- 2026-02-10T21:57:51-05:00 [HIGH] dispatch job run-manager-phase8b | type=manager profile=research est_spend=$0.00
+- 2026-02-10T21:57:51-05:00 [MANAGER] Promoted Draft 'Retro Camping Aesthetic Gifts Tee' to Listing Job
+- 2026-02-10T21:58:07-05:00 [HIGH] dispatch job auto-listing-20260210_215751 | type=listing_generator profile=research est_spend=$0.00
+- 2026-02-10T21:58:36-05:00 [HIGH] dispatch job listing-banned-test | type=listing_generator profile=research est_spend=$0.00
+- 2026-02-10T22:01:27-05:00 [HIGH] dispatch job run-manager-phase9 | type=manager profile=research est_spend=$0.00
+- 2026-02-10T22:01:27-05:00 [MANAGER] Promoted Draft 'Retro Neon Cats Tee' to Listing Job
+- 2026-02-10T22:01:27-05:00 [MANAGER] Promoted Staged Listing to Upload Job (Profile: OPS)
+- 2026-02-10T22:01:48-05:00 [HIGH] dispatch job auto-listing-20260210_220127 | type=listing_generator profile=research est_spend=$0.00
+- 2026-02-10T22:01:48-05:00 [HIGH] dispatch job auto-upload-20260210_220127 | type=uploader profile=ops est_spend=$0.00
+- 2026-02-10T22:07:20-05:00 [HIGH] dispatch job run-manager-phase10 | type=manager profile=research est_spend=$0.00
+- 2026-02-10T22:07:20-05:00 [MANAGER] Promoted trend 'Retro Neon Cat Camping' to Draft Job
+- 2026-02-10T22:07:20-05:00 [MANAGER] Promoted Staged Listing to Upload Job (Profile: OPS)
+- 2026-02-10T22:07:20-05:00 [MANAGER] Promoted Live Receipt to Strategist Job
+- 2026-02-10T22:07:21-05:00 [HIGH] dispatch job auto-draft-20260210_220720 | type=product_drafter profile=research est_spend=$0.00
+- 2026-02-10T22:07:21-05:00 [HIGH] dispatch job auto-strategist-20260210_220720 | type=strategist profile=research est_spend=$0.00
+- 2026-02-10T22:07:21-05:00 [HIGH] dispatch job auto-upload-20260210_220720 | type=uploader profile=ops est_spend=$0.00
+- 2026-02-10T22:07:31-05:00 [HIGH] dispatch job run-manager-phase10b | type=manager profile=research est_spend=$0.00
+- 2026-02-10T22:07:31-05:00 [MANAGER] Promoted Draft 'Retro Neon Cat Camping Tee' to Art Director Review Job
+- 2026-02-10T22:07:31-05:00 [MANAGER] Promoted Live Receipt to Strategist Job
+- 2026-02-10T22:07:31-05:00 [HIGH] dispatch job auto-art-review-20260210_220731 | type=art_director profile=research est_spend=$0.00
+- 2026-02-10T22:07:32-05:00 [HIGH] dispatch job auto-strategist-20260210_220731 | type=strategist profile=research est_spend=$0.00
+- 2026-02-10T22:07:39-05:00 [HIGH] dispatch job run-manager-phase10c | type=manager profile=research est_spend=$0.00
+- 2026-02-10T22:07:39-05:00 [MANAGER] Promoted Reviewed Draft 'Retro Neon Cat Camping Tee' to Listing Job
+- 2026-02-10T22:07:39-05:00 [HIGH] dispatch job auto-listing-20260210_220739 | type=listing_generator profile=research est_spend=$0.00
+- 2026-02-10T22:07:46-05:00 [HIGH] dispatch job run-manager-phase10d | type=manager profile=research est_spend=$0.00
+- 2026-02-10T22:07:46-05:00 [MANAGER] Promoted Staged Listing to Upload Job (Profile: OPS)
+- 2026-02-10T22:07:46-05:00 [HIGH] dispatch job auto-upload-20260210_220746 | type=uploader profile=ops est_spend=$0.00
+- 2026-02-10T22:07:54-05:00 [HIGH] dispatch job run-manager-phase10e | type=manager profile=research est_spend=$0.00
+- 2026-02-10T22:07:54-05:00 [MANAGER] Promoted Live Receipt to Strategist Job
+- 2026-02-10T22:07:54-05:00 [HIGH] dispatch job auto-strategist-20260210_220754 | type=strategist profile=research est_spend=$0.00
+- 2026-02-10T22:08:03-05:00 [HIGH] dispatch job run-manager-phase11-dup | type=manager profile=research est_spend=$0.00
+- 2026-02-10T22:08:03-05:00 [MANAGER] Skipped duplicate trend 'Retro Neon Cat Camping' (within 30 days)
+- 2026-02-10T22:11:57-05:00 [HIGH] dispatch job heartbeat-manager-20260210_221157 | type=manager profile=research est_spend=$0.00
+- 2026-02-10T22:17:38-05:00 [CRITICAL] BLOCKED (budget): generate product image (dall-e-3) | est=$0.08 estimated_spend=$0.08
+- 2026-02-10T22:18:00-05:00 [HIGH] generate product image (dall-e-3) | estimated_spend=$0.08
+- 2026-02-10T22:18:24-05:00 [HIGH] generate product image (dall-e-3) | estimated_spend=$0.08
+- 2026-02-10T22:18:26-05:00 [CRITICAL] image generation failed (dall-e-3) | Error code: 400 - {'error': {'message': 'Billing hard limit has been reached', 'type': 'image_generation_user_error', 'param': None, 'code': 'billing_hard_limit_reached'}}
+- 2026-02-10T22:23:46-05:00 [CRITICAL] BLOCKED (budget): dispatch job test-buy-dispatch | est=$50.00 type=fidelity_trader profile=fidelity est_spend=$50.00
+- 2026-02-10T22:23:46-05:00 [HIGH] dispatch job test-drafter-live | type=product_drafter profile=research est_spend=$0.00
+- 2026-02-10T22:23:48-05:00 [HIGH] dispatch job test-drafter-real | type=product_drafter profile=research est_spend=$0.00
+- 2026-02-10T22:23:49-05:00 [HIGH] dispatch job test-market-analyst | type=market_analyst profile=research est_spend=$0.00
+- 2026-02-10T22:23:54-05:00 [HIGH] dispatch job test-trend-live | type=trend_spotter profile=research est_spend=$0.00
+- 2026-02-10T22:24:21-05:00 [HIGH] dispatch job test-buy-dispatch-pretrade | type=fidelity_trader profile=fidelity est_spend=$0.00
+- 2026-02-10T22:29:34-05:00 [HIGH] dispatch job test-fidelity-paper | type=fidelity_trader profile=fidelity est_spend=$0.00
+- 2026-02-10T22:29:34-05:00 [HIGH] dispatch job test-fidelity-live | type=fidelity_trader profile=fidelity est_spend=$0.00
+- 2026-02-10T22:29:34-05:00 [HIGH] dispatch job test-fidelity-paper | type=fidelity_trader profile=fidelity est_spend=$0.00
+- 2026-02-10T22:29:34-05:00 [HIGH] dispatch job test-market-analyst | type=market_analyst profile=research est_spend=$0.00
+- 2026-02-10T22:29:34-05:00 [HIGH] dispatch job heartbeat-live-test | type=fidelity_trader profile=fidelity est_spend=$0.00
+- 2026-02-10T22:29:35-05:00 [HIGH] dispatch job test-market-analyst | type=market_analyst profile=research est_spend=$0.00
+- 2026-02-10T22:30:14-05:00 [HIGH] dispatch job heartbeat-live-test2 | type=fidelity_trader profile=fidelity est_spend=$0.00
+- 2026-02-10T22:34:45-05:00 [MANAGER] Promoted trend 'strategy_keywords: cat, high-contrast, retro' to Draft Job
+- 2026-02-10T22:35:13-05:00 [MANAGER] Skipped duplicate trend 'strategy_keywords: cat, high-contrast, retro' (within 30 days)
+- 2026-02-10T22:35:34-05:00 [MANAGER] Scheduled Market Strategist job for daily market context refresh
+- 2026-02-10T22:35:47-05:00 [MANAGER] Scheduled Market Analyst job for SPY after context refresh
+- 2026-02-10T22:40:46-05:00 [HIGH] dispatch job auto-draft-20260210_223445 | type=product_drafter profile=research est_spend=$0.00
+- 2026-02-10T22:40:48-05:00 [HIGH] dispatch job auto-market-analyst-SPY-20260210_223547 | type=market_analyst profile=research est_spend=$0.00
+- 2026-02-10T22:40:50-05:00 [HIGH] dispatch job test-fidelity-paper-phase16 | type=fidelity_trader profile=fidelity est_spend=$0.00
+- 2026-02-10T22:40:50-05:00 [HIGH] dispatch job test-manager-phase15 | type=manager profile=research est_spend=$0.00
+- 2026-02-10T22:40:51-05:00 [HIGH] dispatch job test-manager-phase15b | type=manager profile=research est_spend=$0.00
+- 2026-02-10T22:40:51-05:00 [HIGH] dispatch job test-manager-phase15c | type=manager profile=research est_spend=$0.00
+- 2026-02-10T22:40:51-05:00 [HIGH] dispatch job test-manager-phase15d | type=manager profile=research est_spend=$0.00
+- 2026-02-10T22:41:20-05:00 [HIGH] dispatch job test-fidelity-paper-phase16b | type=fidelity_trader profile=fidelity est_spend=$0.00
+- 2026-02-10T22:44:41-05:00 [HIGH] dispatch job test-alpha-dispatch | type=alpha_report profile=research est_spend=$0.00
+- 2026-02-10T22:44:41-05:00 [HIGH] dispatch job test-alpha-report | type=alpha_report profile=research est_spend=$0.00
+- 2026-02-10T22:44:41-05:00 [HIGH] dispatch job test-manager-phase17 | type=manager profile=research est_spend=$0.00
+- 2026-02-13T01:50:58-05:00 [HIGH] dispatch job job-20260213-015042-d0dbe691 | type=pack_run profile=research est_spend=$0.00
+- 2026-02-13T01:55:17-05:00 [HIGH] dispatch job triad-smoke6-control-plane-20260213-judge-job-20260213-015042-d0dbe691 | type=triad_run profile=research est_spend=$0.00

@@ -1,0 +1,42 @@
+{
+  "research": {
+    "date": "2026-02-13",
+    "daily_limit_usd": 5.0,
+    "spent_today_usd": 0.0,
+    "max_share": 0.5,
+    "events": [
+      {
+        "ts": "2026-02-13T01:53:06-05:00",
+        "amount_usd": 0.0,
+        "reason": "job_acked",
+        "meta": {
+          "job_id": "job-20260213-015042-d0dbe691",
+          "task_type": "pack_run"
+        }
+      },
+      {
+        "ts": "2026-02-13T01:57:57-05:00",
+        "amount_usd": 0.0,
+        "reason": "job_acked",
+        "meta": {
+          "job_id": "triad-smoke6-control-plane-20260213-judge-job-20260213-015042-d0dbe691",
+          "task_type": "triad_run"
+        }
+      }
+    ]
+  },
+  "ops": {
+    "date": "2026-02-13",
+    "daily_limit_usd": 3.0,
+    "spent_today_usd": 0.0,
+    "max_share": 0.4,
+    "events": []
+  },
+  "fidelity": {
+    "date": "2026-02-13",
+    "daily_limit_usd": 2.0,
+    "spent_today_usd": 0.0,
+    "max_share": 0.3,
+    "events": []
+  }
+}

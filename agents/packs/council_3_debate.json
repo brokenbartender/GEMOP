@@ -1,0 +1,35 @@
+{
+  "pack_id": "council_3_debate",
+  "version": "1.0.0",
+  "description": "3-role debate pack (proposer/critic/judge) using a 4-round max protocol and structured medium-verbosity outputs.",
+  "shared_header_templates": [
+    "agents/templates/shared_constraints.md",
+    "agents/templates/council_debate_protocol.md"
+  ],
+  "defaults": {
+    "raw_gemini_path": "gemini"
+  },
+  "roles": [
+    {
+      "role_id": "proposer",
+      "template": "agents/roles/council_proposer.md"
+    },
+    {
+      "role_id": "critic",
+      "template": "agents/roles/council_critic.md"
+    },
+    {
+      "role_id": "judge",
+      "template": "agents/roles/council_judge.md"
+    }
+  ],
+  "routing_hints": {
+    "preferred_profile": "research",
+    "tool_allowlist_hints": ["filesystem", "shell", "git"]
+  },
+  "output_layout": {
+    "out_dir": ".agent-jobs/{{RUN_ID}}/out",
+    "shared_dir": ".agent-jobs/{{RUN_ID}}/out/shared",
+    "per_role_dir": ".agent-jobs/{{RUN_ID}}/out/{{ROLE_ID}}"
+  }
+}

@@ -1,0 +1,128 @@
+{
+    "version":  1,
+    "filesystem":  {
+                       "allow_all_roots":  true,
+                       "allowed_roots":  [
+                                             "C:\\Gemini\\work",
+                                             "C:\\Gemini\\ramshare",
+                                             "C:\\Gemini\\profiles",
+                                             "C:\\Gemini\\scripts",
+                                             "C:\\Gemini\\mcp",
+                                             "C:\\Users\\codym\\.Gemini"
+                                         ],
+                       "max_read_bytes":  1048576,
+                       "max_write_bytes":  524288
+                   },
+    "network":  {
+                    "allow_all_domains":  true,
+                    "allow_http":  true,
+                    "allowed_domains":  [
+                                            "developers.openai.com",
+                                            "api.openai.com",
+                                            "trends.google.com",
+                                            "news.google.com",
+                                            "finance.yahoo.com",
+                                            "query1.finance.yahoo.com",
+                                            "query2.finance.yahoo.com"
+                                        ],
+                    "max_response_bytes":  1048576
+                },
+    "control_plane":  {
+                          "stop_files":  [
+                                             "C:\\Gemini\\STOP_ALL_AGENTS.flag",
+                                             "C:\\Gemini\\ramshare\\state\\STOP"
+                                         ]
+                      },
+    "shell":  {
+                  "allow_all_commands":  true,
+                  "timeout_sec_max":  60,
+                  "blocked_substrings":  [
+                                             "rm -rf",
+                                             "rmdir /s",
+                                             "del /f /s",
+                                             "format ",
+                                             "shutdown ",
+                                             "Stop-Computer",
+                                             "Restart-Computer"
+                                         ],
+                  "allowed_prefixes":  [
+                                           [
+                                               "git"
+                                           ],
+                                           [
+                                               "python"
+                                           ],
+                                           [
+                                               "C:\\Gemini\\.venv\\Scripts\\python.exe"
+                                           ],
+                                           [
+                                               "powershell",
+                                               "-Command",
+                                               "Get-Content"
+                                           ],
+                                           [
+                                               "powershell",
+                                               "-Command",
+                                               "Get-ChildItem"
+                                           ],
+                                           [
+                                               "powershell",
+                                               "-Command",
+                                               "Select-String"
+                                           ]
+                                       ]
+              },
+    "screen_perception":  {
+                              "allowed_processes":  [
+                                                        "Code.exe",
+                                                        "chrome.exe",
+                                                        "msedge.exe",
+                                                        "WindowsTerminal.exe",
+                                                        "powershell.exe",
+                                                        "cmd.exe",
+                                                        "mstsc.exe",
+                                                        "vmconnect.exe"
+                                                    ],
+                              "blocked_title_keywords":  [
+                                                             "Bitwarden",
+                                                             "1Password",
+                                                             "Bank",
+                                                             "Wallet",
+                                                             "Password"
+                                                         ],
+                              "max_image_width":  1600,
+                              "sidecar_title_patterns":  [
+                                                             "remote desktop",
+                                                             "mstsc",
+                                                             "vmconnect"
+                                                         ]
+                          },
+    "ui_automation":  {
+                          "allowed_processes":  [
+                                                    "Code.exe",
+                                                    "chrome.exe",
+                                                    "msedge.exe",
+                                                    "WindowsTerminal.exe",
+                                                    "powershell.exe",
+                                                    "cmd.exe",
+                                                    "mstsc.exe",
+                                                    "vmconnect.exe"
+                                                ],
+                          "blocked_title_keywords":  [
+                                                         "Bitwarden",
+                                                         "1Password",
+                                                         "Bank",
+                                                         "Wallet",
+                                                         "Password"
+                                                     ],
+                          "allow_focus_steal":  false,
+                          "allow_cursor_injection":  false,
+                          "yield_on_user_activity_sec":  2,
+                          "require_sidecar_window":  true,
+                          "sidecar_title_patterns":  [
+                                                         "remote desktop",
+                                                         "mstsc",
+                                                         "vmconnect"
+                                                     ]
+                      }
+}

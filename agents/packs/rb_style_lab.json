@@ -1,0 +1,55 @@
+{
+  "pack_id": "rb_style_lab",
+  "version": "1.0.0",
+  "description": "8-role workflow to analyze a reference line-art dataset, generate concepts, and define a repeatable production + tracking system.",
+  "shared_header_templates": [
+    "agents/templates/shared_constraints.md",
+    "agents/templates/rb_style_lab_context.md"
+  ],
+  "defaults": {
+    "raw_gemini_path": "gemini"
+  },
+  "roles": [
+    {
+      "role_id": "style_analyst",
+      "template": "agents/roles/rb_style_lab_style_analyst.md"
+    },
+    {
+      "role_id": "prompt_engineer",
+      "template": "agents/roles/rb_style_lab_prompt_engineer.md"
+    },
+    {
+      "role_id": "series_planner",
+      "template": "agents/roles/rb_style_lab_series_planner.md"
+    },
+    {
+      "role_id": "seo_listing_writer",
+      "template": "agents/roles/rb_style_lab_seo_listing_writer.md"
+    },
+    {
+      "role_id": "embedder_indexer",
+      "template": "agents/roles/rb_style_lab_embedder_indexer.md"
+    },
+    {
+      "role_id": "ops_tracker",
+      "template": "agents/roles/rb_style_lab_ops_tracker.md"
+    },
+    {
+      "role_id": "pipeline_engineer",
+      "template": "agents/roles/rb_style_lab_pipeline_engineer.md"
+    },
+    {
+      "role_id": "experiment_metrics_planner",
+      "template": "agents/roles/rb_style_lab_experiment_metrics_planner.md"
+    }
+  ],
+  "routing_hints": {
+    "preferred_profile": "dev",
+    "tool_allowlist_hints": ["filesystem", "shell", "git"]
+  },
+  "output_layout": {
+    "out_dir": ".agent-jobs/{{RUN_ID}}/out",
+    "shared_dir": ".agent-jobs/{{RUN_ID}}/out/shared",
+    "per_role_dir": ".agent-jobs/{{RUN_ID}}/out/{{ROLE_ID}}"
+  }
+}

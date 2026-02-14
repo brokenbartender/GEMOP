@@ -1,0 +1,26 @@
+{
+  "id": "daily-trend-spotter",
+  "task_type": "trend_spotter",
+  "priority": "P1",
+  "target_profile": "research",
+  "constraints": {
+    "max_runtime_seconds": 900,
+    "allowed_domains": [
+      "trends.google.com",
+      "www.google.com"
+    ],
+    "notes": "Collect rising queries; do not post or spend money."
+  },
+  "output_format": "agent_report_md",
+  "inputs": {
+    "keywords": ["shirt", "mug", "gift"],
+    "lookback_days": 7,
+    "geo": "US"
+  },
+  "policy": {
+    "risk": "low",
+    "estimated_spend_usd": 0,
+    "requires_human_approval": false
+  }
+}
+

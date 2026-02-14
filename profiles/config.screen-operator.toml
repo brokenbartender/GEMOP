@@ -1,0 +1,36 @@
+# Profile: screen-operator (Tier 3: background operator with policy gates)
+
+[mcp_servers.policy-proxy]
+startup_timeout_sec = 10
+command = "C:\\gemini\\.venv\\Scripts\\python.exe"
+args = ["C:\\gemini\\mcp\\policy_proxy\\server.py"]
+
+[mcp_servers.time]
+startup_timeout_sec = 10
+command = "C:\\gemini\\.venv\\Scripts\\python.exe"
+args = ["-m", "mcp_server_time.server"]
+
+[mcp_servers.system-info]
+startup_timeout_sec = 10
+command = "C:\\gemini\\.venv\\Scripts\\python.exe"
+args = ["-m", "system_info_mcp.server"]
+
+[mcp_servers.notify]
+startup_timeout_sec = 10
+command = "C:\\gemini\\.venv\\Scripts\\python.exe"
+args = ["C:\\gemini\\mcp\\notify\\server.py"]
+
+[mcp_servers.scheduler]
+startup_timeout_sec = 10
+command = "C:\\gemini\\.venv\\Scripts\\python.exe"
+args = ["C:\\gemini\\mcp\\scheduler\\server.py"]
+
+[mcp_servers.screen-perception]
+startup_timeout_sec = 20
+command = "C:\\gemini\\.venv\\Scripts\\python.exe"
+args = ["C:\\gemini\\mcp\\screen_perception\\server.py"]
+
+[mcp_servers.ui-automation]
+startup_timeout_sec = 20
+command = "C:\\gemini\\.venv\\Scripts\\python.exe"
+args = ["C:\\gemini\\mcp\\ui_automation\\server.py"]

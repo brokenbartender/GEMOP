@@ -1,0 +1,51 @@
+{
+  "pack_id": "triad_autonomous",
+  "version": "1.0.0",
+  "description": "3-agent autonomous state machine pack: Architect -> Engineer -> Tester (controller-enforced routing).",
+  "shared_header_templates": [
+    "agents/templates/shared_constraints.md",
+    "agents/templates/triad_protocol.md"
+  ],
+  "defaults": {
+    "raw_gemini_path": "gemini"
+  },
+  "roles": [
+    {
+      "role_id": "architect",
+      "template": "agents/roles/triad_architect.md"
+    },
+    {
+      "role_id": "engineer",
+      "template": "agents/roles/triad_engineer.md"
+    },
+    {
+      "role_id": "tester",
+      "template": "agents/roles/triad_tester.md"
+    },
+    {
+      "role_id": "growth_engineer",
+      "template": "agents/roles/growth_engineer.md"
+    },
+    {
+      "role_id": "data_analyst",
+      "template": "agents/roles/data_analyst.md"
+    },
+    {
+      "role_id": "content_marketer",
+      "template": "agents/roles/content_marketer.md"
+    },
+    {
+      "role_id": "market_researcher",
+      "template": "agents/roles/market_researcher.md"
+    }
+  ],
+  "routing_hints": {
+    "preferred_profile": "dev",
+    "tool_allowlist_hints": ["filesystem", "shell", "git"]
+  },
+  "output_layout": {
+    "out_dir": ".agent-jobs/{{RUN_ID}}/out",
+    "shared_dir": ".agent-jobs/{{RUN_ID}}/out/shared",
+    "per_role_dir": ".agent-jobs/{{RUN_ID}}/out/{{ROLE_ID}}"
+  }
+}

@@ -1,0 +1,28 @@
+#!/usr/bin/env sh
+set -eu
+
+MSG_FILE="$1"
+
+if [ ! -f "$MSG_FILE" ]; then
+  echo "commit-msg hook: missing message file" >&2
+  exit 1
+fi
+
+# Allow merge/revert commits without strict enforcement.
+if grep -Eiq '^(Merge|Revert)\b' "$MSG_FILE"; then
+  exit 0
+fi
+
+if ! grep -Eq '^Other-Computer:' "$MSG_FILE"; then
+  cat >&2 <<'EOF'
+ERROR: Commit message must include an 'Other-Computer:' section.
+
+Required format example:
+Other-Computer:
+- pull latest main
+- run: powershell -File scripts/health.ps1 -Profile research
+EOF
+  exit 1
+fi
+
+exit 0
