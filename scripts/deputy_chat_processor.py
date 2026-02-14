@@ -3,6 +3,7 @@ import requests
 import sys
 import time
 import os
+import subprocess
 from pathlib import Path
 from datetime import datetime
 
@@ -29,7 +30,24 @@ def get_latest_job(repo_root):
 
 def process_chat(repo_root):
     latest_job = get_latest_job(repo_root)
-    if not latest_job: return
+    if not latest_job:
+        # Optimization: Initialize session from global intent file if no job active
+        intent_file = Path(repo_root) / "commander_intent.txt"
+        if intent_file.exists():
+            log("Found commander_intent.txt. Initializing session...")
+            try:
+                intent = intent_file.read_text(encoding="utf-8").strip()
+                if intent:
+                    subprocess.Popen(
+                        ["powershell.exe", "-File", "scripts/gemini_orchestrator.ps1", "-Prompt", intent, "-RepoRoot", str(repo_root)],
+                        cwd=str(repo_root),
+                        creationflags=subprocess.CREATE_NEW_CONSOLE
+                    )
+                    intent_file.unlink()
+                    time.sleep(5) # Give it time to create the job dir
+            except Exception as e:
+                log(f"Error processing commander_intent.txt: {e}")
+        return
 
     history_file = latest_job / "state" / "chat_history.jsonl"
     if not history_file.exists(): return

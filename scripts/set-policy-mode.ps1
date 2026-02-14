@@ -43,7 +43,7 @@ Write-Host "Backup written: $backupPath"
 if ($RestartGemini) {
   Write-Host "Restarting Gemini-related background processes..."
   Get-CimInstance Win32_Process -Filter "Name='Gemini.exe' OR Name='python.exe' OR Name='powershell.exe'" |
-    Where-Object { $_.CommandLine -like '*policy_proxy*' -or $_.CommandLine -like '*Gemini --full-auto*' } |
+    Where-Object { ($_.CommandLine -like '*policy_proxy*' -or $_.CommandLine -like '*Gemini --full-auto*') -and $_.ProcessId -ne $PID } |
     ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
   Write-Host "Restart requested; run start-Gemini.ps1 again for clean session."
 }

@@ -79,3 +79,5 @@
 - 2026-02-10T22:44:41-05:00 [HIGH] dispatch job test-manager-phase17 | type=manager profile=research est_spend=$0.00
 - 2026-02-13T01:50:58-05:00 [HIGH] dispatch job job-20260213-015042-d0dbe691 | type=pack_run profile=research est_spend=$0.00
 - 2026-02-13T01:55:17-05:00 [HIGH] dispatch job triad-smoke6-control-plane-20260213-judge-job-20260213-015042-d0dbe691 | type=triad_run profile=research est_spend=$0.00
+- 2026-02-14T14:48:55-05:00 [HIGH] dispatch job test-functional-job | type=trend_spotter profile=research est_spend=$0.00
+- 2026-02-14T14:50:13-05:00 [HIGH] dispatch job test-functional-job | type=trend_spotter profile=research est_spend=$0.00

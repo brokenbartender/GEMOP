@@ -103,7 +103,7 @@ if prompt:
         # Start a new "Initial Chat" job if none active
         # This will create the job dir so chat can proceed
         proc = subprocess.Popen(
-            ["powershell.exe", "-File", "scripts/chief_of_staff_orchestrator.ps1", "-Prompt", prompt, "-RepoRoot", str(REPO_ROOT)],
+            ["powershell.exe", "-File", "scripts/gemini_orchestrator.ps1", "-Prompt", prompt, "-RepoRoot", str(REPO_ROOT)],
             cwd=str(REPO_ROOT),
             creationflags=subprocess.CREATE_NEW_CONSOLE
         )

@@ -440,9 +440,9 @@ def main() -> None:
 
     try:
         sys.path.insert(0, str(REPO_ROOT / "scripts"))
-        import GEMINI_governance  # type: ignore
+        import gemini_governance as GEMINI_governance  # type: ignore
     except Exception as e:
-        print(f"ERROR: unable to import scripts/GEMINI_governance.py ({e})")
+        print(f"ERROR: unable to import scripts/gemini_governance.py ({e})")
         sys.exit(1)
 
     job_paths = list(iter_job_files(inbox))

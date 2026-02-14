@@ -23,6 +23,14 @@ HOTKEY_ID = 0xC0DE
 WM_HOTKEY = 0x0312
 
 
+def get_protected_pids() -> List[int]:
+    # Ignore the current script and the parent terminal
+    try:
+        return [os.getpid(), os.getppid()]
+    except AttributeError:
+        return [os.getpid()]
+
+
 def _write_stop_files() -> List[str]:
     written: List[str] = []
     for path in STOP_FILES:

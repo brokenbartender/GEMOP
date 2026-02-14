@@ -7,7 +7,7 @@ from pathlib import Path
 def get_chat_history_path(run_dir=None):
     if run_dir:
         return Path(run_dir) / "state" / "chat_history.jsonl"
-    repo_root = Path("C:/Users/codym/gemini-op-clean")
+    repo_root = Path(os.environ.get("GEMINI_OP_REPO_ROOT", "."))
     latest_run = repo_root / ".agent-jobs/latest"
     return latest_run / "state" / "chat_history.jsonl"
 

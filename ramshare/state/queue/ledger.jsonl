@@ -1,0 +1,10 @@
+{"ts":1771098472.115381,"job_id":"test-functional-job","state":"queued","details":"path=C:\\Users\\codym\\gemini-op-clean\\ramshare\\evidence\\inbox\\test-job.json","host":"Work:51192","extra":{"trace_id":"trace-42f14463-df7d-40d2-862c-c272181ff32e"}}
+{"ts":1771098472.1179106,"job_id":"test-functional-job","state":"skipped","details":"fairness_defer","host":"Work:51192","extra":{"agent_id":"research","score":1.0,"trace_id":"trace-42f14463-df7d-40d2-862c-c272181ff32e"}}
+{"ts":1771098535.1234689,"job_id":"test-functional-job","state":"queued","details":"path=C:\\Users\\codym\\gemini-op-clean\\ramshare\\evidence\\inbox\\test-job.json","host":"Work:31520","extra":{"trace_id":"trace-2b6c7ac5-6a1f-4aab-ac42-2c054d5947eb"}}
+{"ts":1771098535.1234689,"job_id":"test-functional-job","state":"leased","details":"profile=research","host":"Work:31520","extra":{"trace_id":"trace-2b6c7ac5-6a1f-4aab-ac42-2c054d5947eb"}}
+{"ts":1771098535.1394708,"job_id":"test-functional-job","state":"running","details":"task_type=trend_spotter","host":"Work:31520","extra":{"trace_id":"trace-2b6c7ac5-6a1f-4aab-ac42-2c054d5947eb"}}
+{"ts":1771098535.3295984,"job_id":"test-functional-job","state":"failed","details":"executor_exit=1","host":"Work:31520","extra":{"trace_id":"trace-2b6c7ac5-6a1f-4aab-ac42-2c054d5947eb"}}
+{"ts":1771098613.2823362,"job_id":"test-functional-job","state":"queued","details":"path=C:\\Users\\codym\\gemini-op-clean\\ramshare\\evidence\\inbox\\test-job.json","host":"Work:31256","extra":{"trace_id":"trace-082fa280-1269-40a8-b372-c4681ff44760"}}
+{"ts":1771098613.2985814,"job_id":"test-functional-job","state":"leased","details":"profile=research","host":"Work:31256","extra":{"trace_id":"trace-082fa280-1269-40a8-b372-c4681ff44760"}}
+{"ts":1771098613.3138077,"job_id":"test-functional-job","state":"running","details":"task_type=trend_spotter","host":"Work:31256","extra":{"trace_id":"trace-082fa280-1269-40a8-b372-c4681ff44760"}}
+{"ts":1771098613.8421826,"job_id":"test-functional-job","state":"acked","details":"completed","host":"Work:31256","extra":{"trace_id":"trace-082fa280-1269-40a8-b372-c4681ff44760"}}

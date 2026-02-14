@@ -327,7 +327,7 @@ function Invoke-GeminiExternalCommand {
       $proc.WaitForExit()
     }
   } finally {
-    if ($proc -and -not $proc.HasExited) {
+    if ($proc -and -not $proc.HasExited -and $proc.Id -ne $PID) {
       try { Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue } catch { }
     }
   }
