@@ -140,7 +140,10 @@ else:
             role = "user" if msg["role"] == "Commander" else "assistant"
             with st.chat_message(role):
                 # If it's the last message and it's from the Deputy, simulate streaming
-                if i == len(messages) - 1 and msg["role"] == "Deputy" and "streamed" not in st.session_state.get(f"msg_{i}", []):
+                if "streamed_messages" not in st.session_state:
+                    st.session_state.streamed_messages = set()
+                
+                if i == len(messages) - 1 and msg["role"] == "Deputy" and i not in st.session_state.streamed_messages:
                     placeholder = st.empty()
                     full_text = ""
                     for char in msg["content"]:
@@ -148,7 +151,6 @@ else:
                         placeholder.markdown(full_text + "▌")
                         time.sleep(0.01)
                     placeholder.markdown(full_text)
-                    if "streamed_messages" not in st.session_state: st.session_state.streamed_messages = set()
                     st.session_state.streamed_messages.add(i)
                 else:
                     st.markdown(msg["content"])
@@ -158,9 +160,11 @@ else:
     if history_file.exists():
         lines = history_file.read_text(encoding="utf-8").splitlines()
         if lines:
-            last_msg = json.loads(lines[-1])
-            if last_msg["role"] == "Commander":
-                is_thinking = True
+            try:
+                last_msg = json.loads(lines[-1])
+                if last_msg["role"] == "Commander":
+                    is_thinking = True
+            except: pass
     
     if is_thinking:
         with st.chat_message("assistant"):
@@ -201,5 +205,7 @@ if prompt := st.chat_input("Commander's Intent..."):
 
 # Auto-Refresh Logic
 if latest_job:
-    time.sleep(2)
+    # Use different rates depending on state
+    rate = 1 if is_thinking else 5
+    time.sleep(rate)
     st.rerun()

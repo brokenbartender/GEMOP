@@ -1,5 +1,7 @@
 import json
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util import Retry
 import sys
 import time
 import os
@@ -18,6 +20,11 @@ IMPORTANT: You have access to the business memory (LESSONS). Always reference pa
 to provide proactive insights. If you see a risk based on memory, warn the Commander immediately."""
 
 LOG_FILE = Path("deputy_processor.log")
+
+# --- Socket Hardening (v2.1) ---
+adapter = HTTPAdapter(max_retries=Retry(total=3, backoff_factor=1, status_forcelist=[500, 502, 503, 504]))
+session = requests.Session()
+session.mount("http://", adapter)
 
 def log(msg):
     ts = datetime.now().isoformat()
@@ -96,11 +103,12 @@ def process_chat(repo_root):
 
         try:
             log(f"Calling Ollama ({MODEL})...")
-            response = requests.post(OLLAMA_URL, json={
+            # Using tuple timeout: (connect, read)
+            response = session.post(OLLAMA_URL, json={
                 "model": MODEL,
                 "prompt": full_prompt,
                 "stream": False
-            }, timeout=300)
+            }, timeout=(10, 300))
             
             if response.status_code == 200:
                 answer = response.json().get("response", "").strip()
