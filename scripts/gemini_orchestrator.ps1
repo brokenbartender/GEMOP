@@ -100,7 +100,7 @@ function Run-AgentFoundry([string]$BaseRepo, [string]$MissionPrompt, [string]$Ta
   
   Log-Line "Foundry: Running check for specialized roles..."
   # We use the current session's python to run the foundry
-  $res = Invoke-GeminiExternalCommand -FilePath 'python' -ArgumentList @($foundryScript, '--mission', $MissionPrompt, '--run-dir', $TargetRunDir) -WorkingDirectory $BaseRepo -TimeoutSec 300
+  $res = Invoke-GeminiExternalCommand -FilePath 'python' -ArgumentList @($foundryScript, '--mission', "`"$MissionPrompt`"", '--run-dir', $TargetRunDir) -WorkingDirectory $BaseRepo -TimeoutSec 300
   
   if ($res.ExitCode -eq 0) {
     foreach ($line in $res.StdOut.Split("`n")) {
@@ -128,20 +128,31 @@ Resolve the run directory to operate on.
 .DESCRIPTION
 If -RunDir is empty, selects the newest directory under <RepoRoot>\.agent-jobs.
 #>
-function Resolve-RunDir([string]$Base, [string]$Requested) {
+function Resolve-RunDir([string]$Base, [string]$Requested, [string]$Prompt) {
   if (-not [string]::IsNullOrWhiteSpace($Requested)) {
+    if (-not (Test-Path $Requested)) {
+        New-Item -ItemType Directory -Path $Requested -Force | Out-Null
+    }
     $p = Resolve-Path -LiteralPath $Requested -ErrorAction Stop
     return $p.Path
   }
 
-
   $jobsRoot = Join-Path $Base ".agent-jobs"
   if (-not (Test-Path -LiteralPath $jobsRoot -PathType Container)) {
-    throw "Missing jobs root: $jobsRoot"
+    New-Item -ItemType Directory -Path $jobsRoot -Force | Out-Null
   }
+
+  if (-not [string]::IsNullOrWhiteSpace($Prompt)) {
+      $timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
+      $newJobDir = Join-Path $jobsRoot "job-$timestamp"
+      New-Item -ItemType Directory -Path $newJobDir -Force | Out-Null
+      Log-Line "Orchestrator: Created new mission directory: $newJobDir"
+      return $newJobDir
+  }
+
   $latest = Get-ChildItem -LiteralPath $jobsRoot -Directory -ErrorAction Stop | Sort-Object LastWriteTime -Descending | Select-Object -First 1
   if (-not $latest) {
-    throw "No run directories found under: $jobsRoot"
+    throw "No run directories found under: $jobsRoot and no prompt provided to create one."
   }
   return $latest.FullName
 }
@@ -357,7 +368,7 @@ function Inject-MirrorContext([string]$BaseRepo, [string]$TargetRunDir) {
     $lines = Get-Content $lessonsPath
     $lessons = $lines | Where-Object { $_.Trim().StartsWith("- ") }
     if ($lessons) {
-      $memorySummary = ($lessons | Select-Object -Last 3) -join " | "
+      $memorySummary = (@($lessons) | Select-Object -Last 3) -join " | "
     }
   }
 
@@ -366,14 +377,14 @@ function Inject-MirrorContext([string]$BaseRepo, [string]$TargetRunDir) {
   if (Test-Path $packPath) {
     try {
       $pack = Get-Content $packPath -Raw | ConvertFrom-Json
-      $roles = $pack.roles.role_id
+      $roles = @($pack.roles.role_id)
     } catch {}
   }
 
   $prompts = Get-ChildItem $TargetRunDir -File -Filter "prompt*.txt" | Sort-Object Name
   $i = 0
   foreach ($p in $prompts) {
-    $role = if ($i -lt $roles.Count) { $roles[$i] } else { "specialist" }
+    $role = if ($i -lt @($roles).Count) { $roles[$i] } else { "specialist" }
     $roleFile = Join-Path $BaseRepo "agents\roles\$role.md"
     $identity = if (Test-Path $roleFile) { Get-Content $roleFile -Raw } else { "You are a specialist agent." }
     
@@ -438,7 +449,7 @@ function Start-RunScripts([string]$TargetRunDir, [int]$Parallel, [int]$MaxRuntim
   }
   if ($Parallel -lt 1) { $Parallel = 1 }
 
-  Log-Line "launching $($scripts.Count) agent scripts (max_parallel=$Parallel)"
+  Log-Line "launching $(@($scripts).Count) agent scripts (max_parallel=$Parallel)"
   $queue = [System.Collections.Generic.Queue[object]]::new()
   foreach ($s in $scripts) { $queue.Enqueue($s) }
   $active = @()
@@ -531,7 +542,7 @@ Assert-GeminiCommand -CommandName 'python'
 Assert-GeminiCommand -CommandName 'git'
 Wait-GeminiGitLockClear -RepoRoot $RepoRoot -TimeoutSec $GitLockTimeoutSec
 
-$resolvedRunDir = Resolve-RunDir -Base $RepoRoot -Requested $RunDir
+$resolvedRunDir = Resolve-RunDir -Base $RepoRoot -Requested $RunDir -Prompt $Prompt
 $runName = Split-Path $resolvedRunDir -Leaf
 $logDir = if (-not [string]::IsNullOrWhiteSpace($LogDirectory)) { $LogDirectory } else { $resolvedRunDir }
 Initialize-GeminiLogging -LogDirectory $logDir -LogFileName 'triad_orchestrator.log'
@@ -596,12 +607,12 @@ try {
   Inject-MirrorContext -BaseRepo $RepoRoot -TargetRunDir $resolvedRunDir
 
   $parseFailures = Test-RunScriptParsing -TargetRunDir $resolvedRunDir
-  if ($parseFailures.Count -gt 0) {
+  if (@($parseFailures).Count -gt 0) {
     throw ("run script parse failures:`n" + ($parseFailures -join "`n"))
   }
 
   if ($EnableCouncilBus) {
-    $agentCount = (Get-ChildItem $resolvedRunDir -File -Filter "run-agent*.ps1" | Measure-Object).Count
+    $agentCount = @(Get-ChildItem $resolvedRunDir -File -Filter "run-agent*.ps1").Count
     Initialize-CouncilBus -BaseRepo $RepoRoot -TargetRunDir $resolvedRunDir -Pattern $CouncilPattern -AgentCount $agentCount
     $script:CouncilBusEnabled = $true
   }

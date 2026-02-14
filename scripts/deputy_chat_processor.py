@@ -6,20 +6,45 @@ import sys
 import time
 import os
 import subprocess
+import psutil
 from pathlib import Path
 from datetime import datetime
 
 # --- Configuration ---
 OLLAMA_URL = "http://localhost:11434/api/generate"
 MODEL = "phi3:mini"
-MANAGER_PROMPT = """You are the Commander's Operations Manager. You are in a direct chat. 
-Acknowledge greetings, answer questions about the business, and help the Commander brainstorm new missions. 
-Stay in character. Use professional, proactive, and brief language. Address the user as 'Commander'.
+MANAGER_PROMPT = """You are the Commander's Chief of Staff (Deputy v3.0). 
+You manage the Gemini-OP ecosystem. Address the user as 'Commander'.
 
-IMPORTANT: You have access to the business memory (LESSONS). Always reference past successes or failures 
-to provide proactive insights. If you see a risk based on memory, warn the Commander immediately."""
+### OPERATIONAL CAPABILITIES:
+1. INTERNAL MONOLOGUE: Before your deep strategic answer, provide a very brief [ACK] line.
+2. TEAM SPAWNING: If a new mission is requested, identify the needed specialists and output: [SPAWN_TEAM: specialist1, specialist2].
+3. AUDITING: Use the MISSION REPORT provided to critique specialist performance.
+4. MEMORY: Use the LESSONS provided to avoid past failures.
 
-LOG_FILE = Path("deputy_processor.log")
+### STYLE:
+Professional, direct, and proactive. Do not wait for permission if a mission is clear—request the team spawn immediately."""
+
+# --- Survivor Protocol (v2.2) ---
+REPO_ROOT = Path(os.environ.get("GEMINI_OP_REPO_ROOT", Path(__file__).resolve().parents[1]))
+PID_FILE = REPO_ROOT / ".gemini/deputy.pid"
+LOG_FILE = REPO_ROOT / "deputy_processor.log"
+
+def enforce_single_instance():
+    if PID_FILE.exists():
+        try:
+            old_pid = int(PID_FILE.read_text().strip())
+            if psutil.pid_exists(old_pid):
+                old_proc = psutil.Process(old_pid)
+                if "deputy_chat_processor.py" in " ".join(old_proc.cmdline()):
+                    log(f"Killing old instance (PID {old_pid})")
+                    old_proc.terminate()
+                    old_proc.wait(timeout=5)
+        except Exception as e:
+            log(f"Survivor Protocol error: {e}")
+    
+    PID_FILE.parent.mkdir(parents=True, exist_ok=True)
+    PID_FILE.write_text(str(os.getpid()))
 
 # --- Socket Hardening (v2.1) ---
 adapter = HTTPAdapter(max_retries=Retry(total=3, backoff_factor=1, status_forcelist=[500, 502, 503, 504]))
@@ -28,6 +53,7 @@ session.mount("http://", adapter)
 
 def log(msg):
     ts = datetime.now().isoformat()
+    # Force UTF-8 encoding to prevent weird characters in logs
     with open(LOG_FILE, "a", encoding="utf-8") as f:
         f.write(f"[{ts}] {msg}\n")
 
@@ -38,11 +64,53 @@ def get_latest_job(repo_root):
     if not subdirs: return None
     return max(subdirs, key=lambda p: p.stat().st_mtime)
 
-def get_memory(repo_root):
+def get_memory(repo_root, query=""):
     memory_path = Path(repo_root) / "ramshare/learning/memory/lessons.md"
-    if memory_path.exists():
-        return memory_path.read_text(encoding="utf-8")
-    return "No business memory found yet."
+    if not memory_path.exists():
+        return "No business memory found yet."
+    
+    content = memory_path.read_text(encoding="utf-8")
+    lessons = [line for line in content.splitlines() if line.strip().startswith("- ")]
+    
+    if not query:
+        return "\n".join(lessons[-5:]) # Default to last 5
+    
+    # Simple keyword match for relevance
+    keywords = [k.lower() for k in query.split() if len(k) > 3]
+    relevant = []
+    for lesson in lessons:
+        if any(k in lesson.lower() for k in keywords):
+            relevant.append(lesson)
+    
+    # Return matched lessons or the most recent ones if no match
+    result = relevant[-5:] if relevant else lessons[-5:]
+    return "\n".join(result)
+
+def get_mission_report(job_dir):
+    report_path = job_dir / "learning-summary.json"
+    if report_path.exists():
+        try:
+            data = json.loads(report_path.read_text(encoding="utf-8"))
+            return f"LATEST MISSION REPORT: Avg Score: {data.get('avg_score')}, Success: {data.get('success_count')}/{data.get('agent_count')}"
+        except: pass
+    return "No recent mission report available."
+
+def trigger_foundry(repo_root, mission, team_tag):
+    try:
+        # Extract team from [SPAWN_TEAM: x, y]
+        team_str = team_tag.split(":")[1].replace("]", "").strip()
+        log(f"Foundry Triggered for team: {team_str}")
+        
+        # We call orchestrator directly with the new intent
+        subprocess.Popen(
+            ["powershell.exe", "-File", "scripts/gemini_orchestrator.ps1", "-Prompt", mission, "-RepoRoot", str(repo_root)],
+            cwd=str(repo_root),
+            creationflags=subprocess.CREATE_NEW_CONSOLE
+        )
+        return True
+    except Exception as e:
+        log(f"Foundry trigger failed: {e}")
+        return False
 
 def process_chat(repo_root):
     latest_job = get_latest_job(repo_root)
@@ -92,14 +160,19 @@ def process_chat(repo_root):
             break
     
     if target_msg:
-        log(f"Processing message: {target_msg.get('content')}")
+        content = target_msg.get('content')
+        log(f"Processing message: {content}")
         
-        # Inject memory into context
-        memory_content = get_memory(repo_root)
+        # Fast Acknowledgment in UI
+        add_response(history_file, "🫡 Chief of Staff is calculating strategic impact...", role="System")
+        
+        # Inject memory and mission report into context
+        memory_content = get_memory(repo_root, content)
+        mission_report = get_mission_report(latest_job)
         
         # Build context
         chat_context = "\n".join([f"{m.get('role')}: {m.get('content')}" for m in messages[-5:]])
-        full_prompt = f"{MANAGER_PROMPT}\n\nBUSINESS MEMORY:\n{memory_content}\n\nRecent History:\n{chat_context}\n\nDeputy:"
+        full_prompt = f"{MANAGER_PROMPT}\n\n{mission_report}\n\nRELEVANT LESSONS:\n{memory_content}\n\nRecent History:\n{chat_context}\n\nDeputy:"
 
         try:
             log(f"Calling Ollama ({MODEL})...")
@@ -112,6 +185,11 @@ def process_chat(repo_root):
             
             if response.status_code == 200:
                 answer = response.json().get("response", "").strip()
+                
+                # Check for Spawn Trigger
+                if "[SPAWN_TEAM:" in answer:
+                    trigger_foundry(repo_root, content, answer)
+                
                 # Mark processed before writing response
                 mark_processed(history_file, target_msg.get("ts"))
                 add_response(history_file, answer)
@@ -120,7 +198,7 @@ def process_chat(repo_root):
                 log(f"Ollama error: {response.status_code}")
         except requests.exceptions.ReadTimeout:
             log("Timeout.")
-            add_response(history_file, "🫡 Commander, inference is heavy. Still working...")
+            add_response(history_file, "Manager is thinking (Hardware Latency)...")
         except Exception as e:
             log(f"Request failed: {e}")
 
@@ -140,9 +218,9 @@ def mark_processed(path, ts):
     except Exception as e:
         log(f"Error in mark_processed: {e}")
 
-def add_response(path, content):
+def add_response(path, content, role="Deputy"):
     entry = {
-        "role": "Deputy",
+        "role": role,
         "content": content,
         "ts": time.time(),
         "processed": True
@@ -155,7 +233,9 @@ def add_response(path, content):
 
 if __name__ == "__main__":
     root = sys.argv[1] if len(sys.argv) > 1 else "."
-    log(f"Deputy v2.0 starting at {root}")
+    enforce_single_instance()
+    log(f"Deputy v3.0 starting at {root}")
     while True:
         process_chat(root)
         time.sleep(2)
+

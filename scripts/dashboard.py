@@ -3,12 +3,14 @@ import json
 import os
 import time
 import psutil
+import pandas as pd
 import requests
 import subprocess
 from pathlib import Path
+from datetime import datetime
 
-# --- Configuration & State ---
-st.set_page_config(page_title="Mission Control v2.0", layout="wide", page_icon="💂‍♂️")
+# --- Configuration & Styling ---
+st.set_page_config(page_title="Gemini-OP | Mission Control", layout="wide", page_icon="💎")
 
 def get_repo_root():
     return Path(os.environ.get("GEMINI_OP_REPO_ROOT", Path(__file__).resolve().parents[1]))
@@ -16,55 +18,26 @@ def get_repo_root():
 REPO_ROOT = get_repo_root()
 PID_FILE = REPO_ROOT / ".gemini/current_mission.pid"
 UNIVERSAL_CONTEXT_PATH = REPO_ROOT / "ramshare" / "state" / "universal_context.json"
+LESSONS_PATH = REPO_ROOT / "ramshare/learning/memory/lessons.md"
+LEDGER_PATH = REPO_ROOT / "ramshare/state/queue/ledger.jsonl"
 
-def get_universal_context():
-    if UNIVERSAL_CONTEXT_PATH.exists():
-        try:
-            return json.loads(UNIVERSAL_CONTEXT_PATH.read_text(encoding="utf-8"))
-        except: pass
-    return None
-
-u_context = get_universal_context()
-
-# Global Awareness Bar
-if u_context:
-    with st.container():
-        c1, c2, c3 = st.columns([2, 3, 1])
-        with c1:
-            task_status = "🧠 **THINKING**" if u_context.get("is_processing") else f"🎯 **Task:** {u_context.get('current_task', 'Idle')}"
-            st.markdown(task_status)
-        with c2:
-            st.caption(f"🧠 **Chain of Thought:** {u_context.get('lessons_summary', 'Awaiting context...')}")
-        with c3:
-            st.caption(f"⚡ **Load:** CPU {u_context.get('system_load', {}).get('cpu', 0)}% | RAM {u_context.get('system_load', {}).get('ram', 0)}%")
-    st.divider()
-
-# Custom CSS for Mobile-Responsive Executive Review
+# Custom CSS for Enterprise Look
 st.markdown("""
     <style>
-    .stChatMessage {
-        font-size: 1.1rem !important;
-        max-width: 85% !important;
-    }
-    .stChatInput {
-        position: fixed !important;
-        bottom: 2rem !important;
-    }
-    /* Mobile adjustments */
-    @media (max-width: 768px) {
-        .stChatMessage {
-            max-width: 100% !important;
-            font-size: 1rem !important;
-        }
-    }
+    .stApp { background-color: #050505; color: #e0e0e0; }
+    .stMetric { background-color: #111; border: 1px solid #333; padding: 10px; border-radius: 10px; }
+    .stButton>button { border-radius: 8px; font-weight: 600; }
+    .status-thinking { color: #3b82f6; animation: pulse 2s infinite; }
+    @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
     </style>
 """, unsafe_allow_html=True)
 
-def get_repo_root():
-    return Path(os.environ.get("GEMINI_OP_REPO_ROOT", Path(__file__).resolve().parents[1]))
-
-REPO_ROOT = get_repo_root()
-PID_FILE = REPO_ROOT / ".gemini/current_mission.pid"
+# --- Data Loaders ---
+def get_universal_context():
+    if UNIVERSAL_CONTEXT_PATH.exists():
+        try: return json.loads(UNIVERSAL_CONTEXT_PATH.read_text(encoding="utf-8"))
+        except: return {}
+    return {}
 
 def get_latest_job():
     jobs_dir = REPO_ROOT / ".agent-jobs"
@@ -73,139 +46,166 @@ def get_latest_job():
     if not subdirs: return None
     return max(subdirs, key=lambda p: p.stat().st_mtime)
 
-latest_job = get_latest_job()
+def get_ledger():
+    if not LEDGER_PATH.exists(): return []
+    try:
+        with open(LEDGER_PATH, "r", encoding="utf-8") as f:
+            return [json.loads(line) for line in f if line.strip()]
+    except: return []
 
 # --- Actions ---
-def kill_current_mission():
-    if PID_FILE.exists():
-        try:
-            pid = int(PID_FILE.read_text().strip())
-            parent = psutil.Process(pid)
-            for child in parent.children(recursive=True):
-                child.terminate()
-            parent.terminate()
-            PID_FILE.unlink()
-            return True
-        except:
-            return False
-    return False
+def kill_all_agents():
+    # Write global stop flag
+    (REPO_ROOT / "STOP_ALL_AGENTS.flag").touch()
+    time.sleep(1)
+    st.toast("Kill signal broadcasted!", icon="💀")
 
 def send_chat_message(content, role="Commander"):
-    if latest_job:
+    job = get_latest_job()
+    if job:
         bridge_script = REPO_ROOT / "scripts/chat_bridge.py"
-        cmd = ["python", str(bridge_script), str(latest_job), role, content]
-        subprocess.run(cmd)
+        subprocess.run(["python", str(bridge_script), str(job), role, content])
 
-# --- Sidebar: System Health ---
-st.sidebar.title("💎 Gemini OP v2.0")
-st.sidebar.markdown("**Status:** `OPERATIONAL`")
+# --- Main Layout ---
+u_context = get_universal_context()
+latest_job = get_latest_job()
 
-if st.sidebar.button("💀 Emergency Kill", use_container_width=True):
-    kill_current_mission()
-    st.rerun()
+# Header / Global Status
+with st.container():
+    c1, c2, c3, c4 = st.columns([2, 2, 2, 1])
+    with c1:
+        st.title("💎 Gemini-OP")
+    with c2:
+        status = "🧠 THINKING" if u_context.get("is_processing") else "🟢 READY"
+        st.markdown(f"### Status: `{status}`")
+    with c3:
+        load = u_context.get("system_load", {"cpu": 0, "ram": 0})
+        st.caption(f"⚡ CPU: {load['cpu']}% | RAM: {load['ram']}%")
+    with c4:
+        if st.button("💀 GLOBAL KILL", type="primary", use_container_width=True):
+            kill_all_agents()
 
-health = {"ram": psutil.virtual_memory().percent}
-st.sidebar.metric("RAM Usage", f"{health['ram']}%")
-st.sidebar.caption(f"PID: {PID_FILE.read_text() if PID_FILE.exists() else 'None'}")
+st.divider()
 
-# --- Main Chat Interface ---
-st.title("💂‍♂️ Operations Manager")
+# Tab Navigation
+tab_tactical, tab_neural, tab_foundry, tab_logs, tab_system = st.tabs([
+    "🎯 Tactical Command", "🧠 Neural Link", "🏗️ Agent Foundry", "📊 Fleet Logs", "⚙️ System Ops"
+])
 
-if not latest_job:
-    st.info("System Ready. Commander, please state your operational goal.")
-else:
-    state_dir = latest_job / "state"
-    history_file = state_dir / "chat_history.jsonl"
-    brief_path = state_dir / "consolidated_brief.md"
-    dec_path = state_dir / "decision.json"
+# --- TAB: TACTICAL ---
+with tab_tactical:
+    col_chat, col_gov = st.columns([3, 1])
     
-    # Staff Activity Logs (Collapsed)
-    with st.expander("📂 Staff Activity & Logs", expanded=False):
-        stdout_logs = list(latest_job.glob("*.stdout.log"))
-        if stdout_logs:
-            for log_file in stdout_logs:
-                st.markdown(f"**{log_file.name}**")
-                st.code(log_file.read_text(encoding="utf-8", errors="ignore")[-1000:])
+    with col_chat:
+        if not latest_job:
+            st.info("No active mission. Commander, state your objective to begin.")
         else:
-            st.write("No active logs found.")
-
-    # Display Chat History
-    if history_file.exists():
-        messages = []
-        with open(history_file, "r", encoding="utf-8") as f:
-            for line in f:
-                messages.append(json.loads(line))
-        
-        for i, msg in enumerate(messages):
-            role = "user" if msg["role"] == "Commander" else "assistant"
-            with st.chat_message(role):
-                # If it's the last message and it's from the Deputy, simulate streaming
-                if "streamed_messages" not in st.session_state:
-                    st.session_state.streamed_messages = set()
+            history_file = latest_job / "state" / "chat_history.jsonl"
+            if history_file.exists():
+                messages = []
+                with open(history_file, "r", encoding="utf-8") as f:
+                    for line in f:
+                        try: messages.append(json.loads(line))
+                        except: pass
                 
-                if i == len(messages) - 1 and msg["role"] == "Deputy" and i not in st.session_state.streamed_messages:
-                    placeholder = st.empty()
-                    full_text = ""
-                    for char in msg["content"]:
-                        full_text += char
-                        placeholder.markdown(full_text + "▌")
-                        time.sleep(0.01)
-                    placeholder.markdown(full_text)
-                    st.session_state.streamed_messages.add(i)
-                else:
-                    st.markdown(msg["content"])
+                for msg in messages:
+                    role = "user" if msg["role"] == "Commander" else "assistant"
+                    with st.chat_message(role):
+                        st.markdown(msg["content"])
+            
+            if u_context.get("is_processing"):
+                with st.chat_message("assistant"):
+                    st.write("Chief of Staff is formulating strategy...")
+                    st.spinner()
 
-    # Thinking Spinner
-    is_thinking = False
-    if history_file.exists():
-        lines = history_file.read_text(encoding="utf-8").splitlines()
-        if lines:
-            try:
-                last_msg = json.loads(lines[-1])
-                if last_msg["role"] == "Commander":
-                    is_thinking = True
-            except: pass
+    with col_gov:
+        st.subheader("🛡️ Governance")
+        if latest_job:
+            brief_path = latest_job / "state" / "consolidated_brief.md"
+            dec_path = latest_job / "state" / "decision.json"
+            if brief_path.exists() and not dec_path.exists():
+                st.warning("Decision Required")
+                st.markdown(brief_path.read_text(encoding="utf-8"))
+                if st.button("✅ APPROVE", use_container_width=True):
+                    dec_path.write_text(json.dumps({"action": "PROCEED"}))
+                    st.rerun()
+                if st.button("🚫 VETO", use_container_width=True):
+                    dec_path.write_text(json.dumps({"action": "VETO"}))
+                    st.rerun()
+            else:
+                st.success("Policies Enforced")
+                st.caption("Awaiting next strategic decision point.")
+
+    # Chat Input
+    if prompt := st.chat_input("State mission objective..."):
+        if not latest_job or st.session_state.get("new_mission"):
+            subprocess.Popen(["powershell.exe", "-File", "scripts/gemini_orchestrator.ps1", "-Prompt", prompt, "-RepoRoot", str(REPO_ROOT)], creationflags=subprocess.CREATE_NEW_CONSOLE)
+            st.toast("Mission Launched!", icon="🚀")
+            time.sleep(2)
+            st.rerun()
+        else:
+            send_chat_message(prompt)
+            st.rerun()
+
+# --- TAB: NEURAL ---
+with tab_neural:
+    st.subheader("🧠 Tactical Memory & Context")
+    c1, c2 = st.columns(2)
+    with c1:
+        st.markdown("### 📝 Recent Lessons")
+        if LESSONS_PATH.exists():
+            st.markdown(LESSONS_PATH.read_text(encoding="utf-8"))
+    with c2:
+        st.markdown("### 🌐 Universal Context")
+        st.json(u_context)
+
+# --- TAB: FOUNDRY ---
+with tab_foundry:
+    st.subheader("🏗️ Strike Team Management")
+    if latest_job:
+        report_path = latest_job / "learning-summary.json"
+        if report_path.exists():
+            report = json.loads(report_path.read_text(encoding="utf-8"))
+            st.metric("Avg Mission Score", f"{report.get('avg_score', 0)}/10")
+            
+            # Score Chart
+            df = pd.DataFrame(report.get("agent_scores", []))
+            if not df.empty:
+                st.bar_chart(df, x="agent_id", y="score")
     
-    if is_thinking:
-        with st.chat_message("assistant"):
-            st.write("Thinking...")
-            st.spinner("Deputy is processing...")
+    st.markdown("---")
+    st.markdown("### 📚 Role Library")
+    roles_dir = REPO_ROOT / "agents/roles"
+    roles = [f.stem for f in roles_dir.glob("*.md")]
+    st.write(", ".join([f"`{r}`" for r in roles]))
 
-    # Governance Briefing
-    if brief_path.exists() and not dec_path.exists():
-        with st.chat_message("assistant"):
-            st.markdown("### 🛡️ Strategic Authorization Required")
-            st.markdown(brief_path.read_text(encoding="utf-8"))
-            c1, c2 = st.columns(2)
-            if c1.button("✅ PROCEED", type="primary", use_container_width=True):
-                dec_path.write_text(json.dumps({"action": "PROCEED"}), encoding="utf-8")
-                send_chat_message("Commander approved the plan. Resuming operations.", role="Deputy")
-                st.rerun()
-            if c2.button("🚫 VETO", use_container_width=True):
-                dec_path.write_text(json.dumps({"action": "VETO"}), encoding="utf-8")
-                send_chat_message("Commander vetoed the plan.", role="Deputy")
-                st.rerun()
+# --- TAB: LOGS ---
+with tab_logs:
+    st.subheader("📊 Operational Audit Trail")
+    ledger_data = get_ledger()
+    if ledger_data:
+        df_ledger = pd.DataFrame(ledger_data)
+        st.dataframe(df_ledger.tail(50), use_container_width=True)
+    
+    with st.expander("📂 Raw Specialist Output", expanded=False):
+        if latest_job:
+            logs = list(latest_job.glob("*.log"))
+            for l in logs:
+                st.text(f"--- {l.name} ---")
+                st.code(l.read_text(encoding="utf-8", errors="ignore")[-2000:])
 
-# Chat Input
-if prompt := st.chat_input("Commander's Intent..."):
-    if not latest_job:
-        proc = subprocess.Popen(
-            ["powershell.exe", "-File", "scripts/gemini_orchestrator.ps1", "-Prompt", prompt, "-RepoRoot", str(REPO_ROOT)],
-            cwd=str(REPO_ROOT),
-            creationflags=subprocess.CREATE_NEW_CONSOLE
-        )
-        PID_FILE.write_text(str(proc.pid))
-        st.toast("Mission Initialized!", icon="🚀")
-        # Initialize chat file immediately for the UI
-        time.sleep(2)
-        st.rerun()
-    else:
-        send_chat_message(prompt)
-        st.rerun()
+# --- TAB: SYSTEM ---
+with tab_system:
+    st.subheader("⚙️ Global Configuration")
+    col1, col2 = st.columns(2)
+    with col1:
+        st.toggle("Autonomous Spawning", value=True, help="Allow Deputy to trigger Foundry")
+        st.slider("Min Acceptance Score", 0, 10, 7)
+    with col2:
+        st.selectbox("Default Specialist Model", ["gemini-2.0-flash-exp", "gemini-1.5-pro"])
+        st.selectbox("Deputy Inference Model", ["phi3:mini", "phi4"])
 
-# Auto-Refresh Logic
-if latest_job:
-    # Use different rates depending on state
-    rate = 1 if is_thinking else 5
-    time.sleep(rate)
-    st.rerun()
+# Auto-Refresh
+time.sleep(5)
+st.rerun()
+
