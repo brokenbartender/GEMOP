@@ -6,10 +6,30 @@ import psutil
 import requests
 import subprocess
 from pathlib import Path
-from streamlit.components.v1 import html
 
 # --- Configuration & State ---
-st.set_page_config(page_title="Gemini OP v1.8 Continuous", layout="wide", page_icon="💂‍♂️")
+st.set_page_config(page_title="Mission Control v2.0", layout="wide", page_icon="💂‍♂️")
+
+# Custom CSS for Mobile-Responsive Executive Review
+st.markdown("""
+    <style>
+    .stChatMessage {
+        font-size: 1.1rem !important;
+        max-width: 85% !important;
+    }
+    .stChatInput {
+        position: fixed !important;
+        bottom: 2rem !important;
+    }
+    /* Mobile adjustments */
+    @media (max-width: 768px) {
+        .stChatMessage {
+            max-width: 100% !important;
+            font-size: 1rem !important;
+        }
+    }
+    </style>
+""", unsafe_allow_html=True)
 
 def get_repo_root():
     return Path(os.environ.get("GEMINI_OP_REPO_ROOT", Path(__file__).resolve().parents[1]))
@@ -43,18 +63,15 @@ def kill_current_mission():
 
 def send_chat_message(content, role="Commander"):
     if latest_job:
-        # Use relative path or absolute path
         bridge_script = REPO_ROOT / "scripts/chat_bridge.py"
         cmd = ["python", str(bridge_script), str(latest_job), role, content]
         subprocess.run(cmd)
 
-# --- UI Setup ---
-st.sidebar.title("💎 Gemini OP")
-st.sidebar.markdown("**Status:** `CONTINUOUS PRESENCE` (v1.8)")
+# --- Sidebar: System Health ---
+st.sidebar.title("💎 Gemini OP v2.0")
+st.sidebar.markdown("**Status:** `OPERATIONAL`")
 
-# Sidebar: System Health
-st.sidebar.header("⚖️ Governance & Health")
-if st.sidebar.button("💀 Emergency Kill", use_container_width=True, key="btn_emergency_kill"):
+if st.sidebar.button("💀 Emergency Kill", use_container_width=True):
     kill_current_mission()
     st.rerun()
 
@@ -63,70 +80,97 @@ st.sidebar.metric("RAM Usage", f"{health['ram']}%")
 st.sidebar.caption(f"PID: {PID_FILE.read_text() if PID_FILE.exists() else 'None'}")
 
 # --- Main Chat Interface ---
-st.title("💂‍♂️ Operations Manager: Direct Link")
+st.title("💂‍♂️ Operations Manager")
 
 if not latest_job:
-    st.info("System Ready. Commander, please state your operational goal or just say hello.")
+    st.info("System Ready. Commander, please state your operational goal.")
 else:
     state_dir = latest_job / "state"
     history_file = state_dir / "chat_history.jsonl"
     brief_path = state_dir / "consolidated_brief.md"
     dec_path = state_dir / "decision.json"
+    
+    # Staff Activity Logs (Collapsed)
+    with st.expander("📂 Staff Activity & Logs", expanded=False):
+        stdout_logs = list(latest_job.glob("*.stdout.log"))
+        if stdout_logs:
+            for log_file in stdout_logs:
+                st.markdown(f"**{log_file.name}**")
+                st.code(log_file.read_text(encoding="utf-8", errors="ignore")[-1000:])
+        else:
+            st.write("No active logs found.")
 
     # Display Chat History
     if history_file.exists():
+        messages = []
         with open(history_file, "r", encoding="utf-8") as f:
-            for i, line in enumerate(f):
-                msg = json.loads(line)
-                with st.chat_message(msg["role"]):
+            for line in f:
+                messages.append(json.loads(line))
+        
+        for i, msg in enumerate(messages):
+            role = "user" if msg["role"] == "Commander" else "assistant"
+            with st.chat_message(role):
+                # If it's the last message and it's from the Deputy, simulate streaming
+                if i == len(messages) - 1 and msg["role"] == "Deputy" and "streamed" not in st.session_state.get(f"msg_{i}", []):
+                    placeholder = st.empty()
+                    full_text = ""
+                    for char in msg["content"]:
+                        full_text += char
+                        placeholder.markdown(full_text + "▌")
+                        time.sleep(0.01)
+                    placeholder.markdown(full_text)
+                    if "streamed_messages" not in st.session_state: st.session_state.streamed_messages = set()
+                    st.session_state.streamed_messages.add(i)
+                else:
                     st.markdown(msg["content"])
+
+    # Thinking Spinner
+    is_thinking = False
+    if history_file.exists():
+        lines = history_file.read_text(encoding="utf-8").splitlines()
+        if lines:
+            last_msg = json.loads(lines[-1])
+            if last_msg["role"] == "Commander":
+                is_thinking = True
+    
+    if is_thinking:
+        with st.chat_message("assistant"):
+            st.write("Thinking...")
+            st.spinner("Deputy is processing...")
 
     # Governance Briefing
     if brief_path.exists() and not dec_path.exists():
-        with st.chat_message("Deputy"):
+        with st.chat_message("assistant"):
             st.markdown("### 🛡️ Strategic Authorization Required")
             st.markdown(brief_path.read_text(encoding="utf-8"))
             c1, c2 = st.columns(2)
-            if c1.button("✅ PROCEED", type="primary", use_container_width=True, key="btn_proceed_mission"):
+            if c1.button("✅ PROCEED", type="primary", use_container_width=True):
                 dec_path.write_text(json.dumps({"action": "PROCEED"}), encoding="utf-8")
                 send_chat_message("Commander approved the plan. Resuming operations.", role="Deputy")
                 st.rerun()
-            if c2.button("🚫 VETO", use_container_width=True, key="btn_veto_mission"):
+            if c2.button("🚫 VETO", use_container_width=True):
                 dec_path.write_text(json.dumps({"action": "VETO"}), encoding="utf-8")
                 send_chat_message("Commander vetoed the plan.", role="Deputy")
                 st.rerun()
 
 # Chat Input
-prompt = st.chat_input("Commander's Intent...", key="chat_commander_intent")
-if prompt:
+if prompt := st.chat_input("Commander's Intent..."):
     if not latest_job:
-        # Start a new "Initial Chat" job if none active
-        # This will create the job dir so chat can proceed
         proc = subprocess.Popen(
             ["powershell.exe", "-File", "scripts/gemini_orchestrator.ps1", "-Prompt", prompt, "-RepoRoot", str(REPO_ROOT)],
             cwd=str(REPO_ROOT),
             creationflags=subprocess.CREATE_NEW_CONSOLE
         )
         PID_FILE.write_text(str(proc.pid))
-        st.toast("Connection Established!", icon="🚀")
-        time.sleep(1)
+        st.toast("Mission Initialized!", icon="🚀")
+        # Initialize chat file immediately for the UI
+        time.sleep(2)
         st.rerun()
     else:
-        # Send message to current job history
         send_chat_message(prompt)
         st.rerun()
 
-# --- Auto-Refresh ---
-# If the last message is from Commander, refresh faster to catch the Deputy's response
-refresh_rate = 2
+# Auto-Refresh Logic
 if latest_job:
-    history_file = latest_job / "state" / "chat_history.jsonl"
-    if history_file.exists():
-        lines = history_file.read_text(encoding="utf-8").splitlines()
-        if lines:
-            last_msg = json.loads(lines[-1])
-            if last_msg["role"] == "Commander":
-                refresh_rate = 1
-
-time.sleep(refresh_rate)
-st.rerun()
+    time.sleep(2)
+    st.rerun()

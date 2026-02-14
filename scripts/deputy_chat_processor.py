@@ -12,7 +12,10 @@ OLLAMA_URL = "http://localhost:11434/api/generate"
 MODEL = "phi3:mini"
 MANAGER_PROMPT = """You are the Commander's Operations Manager. You are in a direct chat. 
 Acknowledge greetings, answer questions about the business, and help the Commander brainstorm new missions. 
-Stay in character. Use professional, proactive, and brief language. Address the user as 'Commander'."""
+Stay in character. Use professional, proactive, and brief language. Address the user as 'Commander'.
+
+IMPORTANT: You have access to the business memory (LESSONS). Always reference past successes or failures 
+to provide proactive insights. If you see a risk based on memory, warn the Commander immediately."""
 
 LOG_FILE = Path("deputy_processor.log")
 
@@ -27,6 +30,12 @@ def get_latest_job(repo_root):
     subdirs = [d for d in jobs_dir.iterdir() if d.is_dir() and d.name != "latest"]
     if not subdirs: return None
     return max(subdirs, key=lambda p: p.stat().st_mtime)
+
+def get_memory(repo_root):
+    memory_path = Path(repo_root) / "ramshare/learning/memory/lessons.md"
+    if memory_path.exists():
+        return memory_path.read_text(encoding="utf-8")
+    return "No business memory found yet."
 
 def process_chat(repo_root):
     latest_job = get_latest_job(repo_root)
@@ -54,7 +63,6 @@ def process_chat(repo_root):
 
     messages = []
     try:
-        # Robust reading line by line
         with open(history_file, "r", encoding="utf-8-sig") as f:
             for line in f:
                 line = line.strip()
@@ -76,9 +84,12 @@ def process_chat(repo_root):
     if target_msg:
         log(f"Processing message: {target_msg.get('content')}")
         
+        # Inject memory into context
+        memory_content = get_memory(repo_root)
+        
         # Build context
-        context = "\n".join([f"{m.get('role')}: {m.get('content')}" for m in messages[-5:]])
-        full_prompt = f"{MANAGER_PROMPT}\n\nRecent History:\n{context}\n\nDeputy:"
+        chat_context = "\n".join([f"{m.get('role')}: {m.get('content')}" for m in messages[-5:]])
+        full_prompt = f"{MANAGER_PROMPT}\n\nBUSINESS MEMORY:\n{memory_content}\n\nRecent History:\n{chat_context}\n\nDeputy:"
 
         try:
             log(f"Calling Ollama ({MODEL})...")
@@ -90,7 +101,7 @@ def process_chat(repo_root):
             
             if response.status_code == 200:
                 answer = response.json().get("response", "").strip()
-                # Mark processed before writing response to avoid loops
+                # Mark processed before writing response
                 mark_processed(history_file, target_msg.get("ts"))
                 add_response(history_file, answer)
                 log(f"Success.")
@@ -112,7 +123,7 @@ def mark_processed(path, ts):
                     if msg.get("ts") == ts:
                         msg["processed"] = True
                     messages.append(msg)
-        with open(path, "w", encoding="utf-8") as f: # Write without BOM
+        with open(path, "w", encoding="utf-8") as f:
             for msg in messages:
                 f.write(json.dumps(msg) + "\n")
     except Exception as e:
@@ -133,7 +144,7 @@ def add_response(path, content):
 
 if __name__ == "__main__":
     root = sys.argv[1] if len(sys.argv) > 1 else "."
-    log(f"Deputy v1.8.1 starting at {root}")
+    log(f"Deputy v2.0 starting at {root}")
     while True:
         process_chat(root)
         time.sleep(2)
