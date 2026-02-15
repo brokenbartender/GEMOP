@@ -1,189 +1,122 @@
-import argparse
-import datetime as dt
-import json
 import os
-import subprocess
 import sys
+import json
 import time
-from pathlib import Path
-from typing import Optional
-try:
-    import psutil
-except ImportError:
-    psutil = None
+import psutil
+import pathlib
+import datetime as dt
+import subprocess
+
+REPO_ROOT = pathlib.Path(__file__).parent.parent
+CONTEXT_FILE = REPO_ROOT / "ramshare/state/universal_context.json"
+KILL_SWITCH = REPO_ROOT / ".gemini/kill.flag"
+LOG_FILE = REPO_ROOT / "agent_runner_debug.log"
+
+STALL_THRESHOLD_SECONDS = 900 # 15 minutes
+
+def log_message(message):
+    """Appends a message to the debug log."""
+    with open(LOG_FILE, "a", encoding="utf-8") as f:
+        f.write(f"[{dt.datetime.now().isoformat()}] [VIGILANCE] {message}\n")
+
+def get_latest_job(jobs_root):
+    """Finds the most recently modified job directory."""
+    jobs_dir = jobs_root / ".agent-jobs"
+    if not jobs_dir.exists():
+        return None
+    
+    subdirs = [d for d in jobs_dir.iterdir() if d.is_dir()]
+    if not subdirs:
+        return None
+        
+    latest_job = max(subdirs, key=lambda d: d.stat().st_mtime)
+    return latest_job
+
+def get_orchestrator_pid(job_dir):
+    """Finds the PID of the orchestrator running for a specific job."""
+    for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
+        try:
+            cmdline = " ".join(proc.info['cmdline'] or [])
+            if "gemini_orchestrator.ps1" in cmdline and str(job_dir) in cmdline:
+                return proc.info['pid']
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            continue
+    return None
+
+def check_for_stall(latest_job):
+    """Checks if the latest mission has stalled."""
+    if not latest_job:
+        return
+
+    log_path = latest_job / "triad_orchestrator.log"
+    if not log_path.exists():
+        return # Not started yet, not a stall.
+
+    last_modified_time = log_path.stat().st_mtime
+    time_since_modified = time.time() - last_modified_time
+
+    if time_since_modified > STALL_THRESHOLD_SECONDS:
+        log_message(f"STALL DETECTED in {latest_job.name}! Last log update was {time_since_modified:.0f}s ago.")
+        
+        # --- HARD RESET PROTOCOL ---
+        orchestrator_pid = get_orchestrator_pid(latest_job)
+        if orchestrator_pid:
+            try:
+                p = psutil.Process(orchestrator_pid)
+                p.kill()
+                log_message(f"Killed stalled orchestrator (PID: {orchestrator_pid}).")
+            except psutil.NoSuchProcess:
+                log_message(f"Stalled orchestrator (PID: {orchestrator_pid}) already gone.")
+
+        # Re-trigger the mission via the Deputy
+        log_message("Requesting Deputy to re-launch the mission.")
+        try:
+            # We need to get the original prompt to relaunch
+            original_prompt = "Default relaunch prompt: Audit and fix system." # Fallback
+            prompt_file = latest_job / "state/prompt1.txt" # Assume agent1 prompt is good enough
+            if prompt_file.exists():
+                original_prompt = prompt_file.read_text(encoding='utf-8').splitlines()[0]
+
+            subprocess.Popen([
+                "python", str(REPO_ROOT / "scripts/chat_bridge.py"),
+                "new", "Commander",
+                f"VIGILANCE ALERT: Mission stalled. Relaunching. GOAL: {original_prompt} [SPAWN_TEAM: architect, engineer, tester]"
+            ], cwd=str(REPO_ROOT))
+        except Exception as e:
+            log_message(f"Failed to request relaunch: {e}")
+        
+        # Finally, archive the failed job to prevent a loop
+        archive_dir = REPO_ROOT / ".agent-jobs/_ARCHIVED_STALLED"
+        archive_dir.mkdir(exist_ok=True)
+        os.rename(latest_job, archive_dir / f"{latest_job.name}_{dt.datetime.now().strftime('%Y%m%d%H%M%S')}")
+        log_message(f"Archived stalled job {latest_job.name}.")
 
 
-REPO_ROOT = Path(os.environ.get("GEMINI_OP_REPO_ROOT", Path(__file__).resolve().parent.parent))
-INBOX_DIR = REPO_ROOT / "ramshare" / "evidence" / "inbox"
-CRASH_LOG = REPO_ROOT / "ramshare" / "evidence" / "crash_log.md"
-KILL_SWITCH = REPO_ROOT / "STOP_ALL_AGENTS.flag"
-DISPATCHER = REPO_ROOT / "scripts" / "GEMINI_dispatcher.py"
-ACCOUNTANT = REPO_ROOT / "ramshare" / "skills" / "skill_accountant.py"
-UNIVERSAL_CONTEXT_PATH = REPO_ROOT / "ramshare" / "state" / "universal_context.json"
-LESSONS_PATH = REPO_ROOT / "ramshare" / "learning" / "memory" / "lessons.md"
-TASK_PATH = Path(r"C:\Users\codym\.Gemini\current_task.json")
-
-
-def get_latest_job(repo_root: Path) -> Optional[Path]:
-    jobs_dir = repo_root / ".agent-jobs"
-    if not jobs_dir.exists(): return None
-    subdirs = [d for d in jobs_dir.iterdir() if d.is_dir() and d.name != "latest"]
-    if not subdirs: return None
-    return max(subdirs, key=lambda p: p.stat().st_mtime)
-
-
-def update_universal_context() -> None:
+def update_universal_context():
     context = {
         "ts": dt.datetime.now().isoformat(),
         "active_pids": [],
-        "current_task": "Unknown",
         "system_load": {"cpu": 0, "ram": 0},
-        "lessons_summary": "No recent lessons."
     }
 
-    # 1. Active PIDs (excluding CLI/Shell)
     if psutil:
-        current_pid = os.getpid()
-        for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
-            try:
-                # Basic filter to find agentic processes
-                cmdline = " ".join(proc.info['cmdline'] or [])
-                if ("gemini" in cmdline or "python" in cmdline) and proc.info['pid'] != current_pid:
-                    if "gemini-heartbeat" not in cmdline and "powershell" not in cmdline:
-                        context["active_pids"].append({"pid": proc.info['pid'], "name": proc.info['name']})
-            except (psutil.NoSuchProcess, psutil.AccessDenied):
-                continue
-        
         context["system_load"]["cpu"] = psutil.cpu_percent()
         context["system_load"]["ram"] = psutil.virtual_memory().percent
-
-    # 2. Current Task & Processing Status
-    context["is_processing"] = False
-    if latest_job := get_latest_job(REPO_ROOT):
-        history_file = latest_job / "state" / "chat_history.jsonl"
-        if history_file.exists():
-            try:
-                lines = history_file.read_text(encoding="utf-8-sig").splitlines()
-                for line in reversed(lines):
-                    if line.strip():
-                        msg = json.loads(line)
-                        if msg.get("role") == "Commander" and not msg.get("processed", False):
-                            context["is_processing"] = True
-                            break
-            except: pass
-
-    if TASK_PATH.exists():
-        try:
-            task_data = json.loads(TASK_PATH.read_text(encoding="utf-8"))
-            context["current_task"] = task_data.get("task", "Idle")
-        except: pass
-
-    # 3. Lessons Learned Summary
-    if LESSONS_PATH.exists():
-        try:
-            lines = LESSONS_PATH.read_text(encoding="utf-8").splitlines()
-            lessons = [l for l in lines if l.strip().startswith("- ")]
-            if lessons:
-                context["lessons_summary"] = " | ".join(lessons[-3:]) # Last 3 lessons
-        except: pass
-
-    UNIVERSAL_CONTEXT_PATH.parent.mkdir(parents=True, exist_ok=True)
-    UNIVERSAL_CONTEXT_PATH.write_text(json.dumps(context, indent=2), encoding="utf-8")
+    
+    CONTEXT_FILE.parent.mkdir(exist_ok=True)
+    CONTEXT_FILE.write_text(json.dumps(context, indent=2))
 
 
-def log_crash(message: str) -> None:
-    CRASH_LOG.parent.mkdir(parents=True, exist_ok=True)
-    if not CRASH_LOG.exists():
-        CRASH_LOG.write_text("# Crash Log\n\n", encoding="utf-8")
-    now_iso = dt.datetime.now().astimezone().isoformat(timespec="seconds")
-    with CRASH_LOG.open("a", encoding="utf-8") as f:
-        f.write(f"- {now_iso} {message}\n")
-
-
-def run_cmd(args: list[str]) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(args, capture_output=True, text=True)
-
-
-def make_manager_job() -> Path:
-    INBOX_DIR.mkdir(parents=True, exist_ok=True)
-    ts = dt.datetime.now().strftime("%Y%m%d_%H%M%S")
-    path = INBOX_DIR / f"job.heartbeat_manager_{ts}.json"
-    payload = {
-        "id": f"heartbeat-manager-{ts}",
-        "task_type": "manager",
-        "target_profile": "research",
-        "policy": {"risk": "low", "estimated_spend_usd": 0},
-    }
-    path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
-    return path
-
-
-def run_dispatcher_drain(max_passes: int) -> None:
-    for _ in range(max_passes):
-        proc = run_cmd([sys.executable, str(DISPATCHER)])
-        if proc.stdout.strip():
-            print(proc.stdout.strip())
-        if proc.returncode != 0:
-            err = proc.stderr.strip() or "dispatcher returned non-zero exit"
-            log_crash(f"dispatcher_error: {err}")
-            return
-        if "No jobs found." in (proc.stdout or ""):
-            return
-
-
-def parse_args() -> argparse.Namespace:
-    ap = argparse.ArgumentParser(description="Heartbeat daemon: accountant + manager dispatch loop")
-    ap.add_argument("--interval-seconds", type=int, default=900, help="Sleep interval between cycles (default 900 = 15 min)")
-    ap.add_argument("--stop-sleep-seconds", type=int, default=60, help="Sleep while kill switch is enabled")
-    ap.add_argument("--drain-passes", type=int, default=6, help="Max dispatcher passes per cycle")
-    ap.add_argument("--default-daily-limit-usd", type=float, default=5.0)
-    ap.add_argument("--once", action="store_true", help="Run one cycle only (for testing)")
-    return ap.parse_args()
-
-
-def main() -> None:
-    args = parse_args()
-
-    while True:
+def main():
+    while not KILL_SWITCH.exists():
         try:
             update_universal_context()
-            if KILL_SWITCH.exists():
-                print(f"Heartbeat paused: kill switch present at {KILL_SWITCH}")
-                if args.once:
-                    return
-                time.sleep(max(args.stop_sleep_seconds, 1))
-                continue
-
-            acct = run_cmd(
-                [
-                    sys.executable,
-                    str(ACCOUNTANT),
-                    "--default-daily-limit-usd",
-                    str(args.default_daily_limit_usd),
-                ]
-            )
-            if acct.stdout.strip():
-                print(acct.stdout.strip())
-            if acct.returncode == 3:
-                print("Heartbeat stopping: accountant triggered emergency stop.")
-                return
-            if acct.returncode != 0:
-                log_crash(f"accountant_error: {acct.stderr.strip() or 'non-zero exit'}")
-                if args.once:
-                    return
-                time.sleep(max(args.interval_seconds, 1))
-                continue
-
-            make_manager_job()
-            run_dispatcher_drain(max(args.drain_passes, 1))
-
+            latest_job = get_latest_job(REPO_ROOT)
+            check_for_stall(latest_job)
         except Exception as e:
-            log_crash(f"heartbeat_exception: {e}")
-
-        if args.once:
-            return
-        time.sleep(max(args.interval_seconds, 1))
-
+            log_message(f"Heartbeat error: {e}")
+        time.sleep(30) # Check every 30 seconds
 
 if __name__ == "__main__":
+    log_message("Vigilance Sentinel Activated.")
     main()

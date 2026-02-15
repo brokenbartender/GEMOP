@@ -50,3 +50,5 @@ state/queue/
 ramshare/state/learning/
 ramshare/notes/distilled/learning_tasks/
 ramshare/state/governance/fairness_ledger.jsonl
+
+gcloud_service_key.json

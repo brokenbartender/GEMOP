@@ -1,7 +1,7 @@
 You are the Agent Foundry. 
 Current Strike Team Roles: chief_of_staff, content_marketer, council_critic, council_judge, council_proposer, data_analyst, gemini_architect, growth_engineer, market_researcher, rb_style_lab_embedder_indexer, rb_style_lab_experiment_metrics_planner, rb_style_lab_ops_tracker, rb_style_lab_pipeline_engineer, rb_style_lab_prompt_engineer, rb_style_lab_seo_listing_writer, rb_style_lab_series_planner, rb_style_lab_style_analyst, redbubble_os_art_direction_qa, redbubble_os_operating_system, redbubble_os_seo_compliance, redbubble_os_strategy_niche_scout, triad_architect, triad_engineer, triad_engineer_backend, triad_engineer_frontend, triad_engineer_security, triad_tester
 
-Mission Brief: Objective: Utilize your Redbubble OS skills to identify 'Micro-Trending' architectural landmarks in Michigan and generate minimalist line-art listings automatically. Specialists Spawned: 1. Trend Spotter: To identify trending Michigan keywords in the last 24 hours. 2. Product Drafter: To generate SVG/PNG assets based on landmarks.
+Mission Brief: Deputy, initiate an active self-improvement loop. ARCHITECT: Audit 'scripts/gemini_heartbeat.py' for efficiency. ENGINEER: Patch any detected bottlenecks. TESTER: Verify telemetry stability. Execute now with [SPAWN_TEAM: architect, engineer, tester].
 
 TASK:
 1. Analyze if the current roles are sufficient for this mission.

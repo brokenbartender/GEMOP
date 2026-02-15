@@ -55,10 +55,14 @@ def get_ledger():
 
 # --- Actions ---
 def kill_all_agents():
-    # Write global stop flag
     (REPO_ROOT / "STOP_ALL_AGENTS.flag").touch()
     time.sleep(1)
     st.toast("Kill signal broadcasted!", icon="💀")
+
+def nuclear_reset():
+    reset_script = REPO_ROOT / "scripts/nuclear_reset.ps1"
+    subprocess.Popen(["powershell.exe", "-File", str(reset_script)], creationflags=subprocess.CREATE_NEW_CONSOLE)
+    st.toast("Nuclear Reset Initiated!", icon="☢️")
 
 def send_chat_message(content, role="Commander"):
     job = get_latest_job()
@@ -86,6 +90,30 @@ with st.container():
             kill_all_agents()
 
 st.divider()
+
+# Sidebar: Latency Monitor
+st.sidebar.title("🩺 Latency Monitor")
+last_msg_ts = 0
+if latest_job:
+    history_file = latest_job / "state" / "chat_history.jsonl"
+    if history_file.exists():
+        try:
+            lines = history_file.read_text(encoding="utf-8-sig").splitlines()
+            if lines:
+                last_msg = json.loads(lines[-1])
+                if last_msg["role"] == "Commander":
+                    last_msg_ts = last_msg["ts"]
+        except: pass
+
+if last_msg_ts > 0 and u_context.get("is_processing"):
+    latency = time.time() - last_msg_ts
+    st.sidebar.metric("Deputy Thinking Time", f"{int(latency)}s")
+    if latency > 30:
+        st.sidebar.error("⚠️ CPU STRESS WARNING: High Inference Latency detected.")
+    elif latency > 15:
+        st.sidebar.warning("🕒 Hardware Handshake in progress...")
+else:
+    st.sidebar.info("System Responsive.")
 
 # Tab Navigation
 tab_tactical, tab_neural, tab_foundry, tab_logs, tab_system = st.tabs([
@@ -148,7 +176,7 @@ with tab_tactical:
 
     # Chat Input
     if prompt := st.chat_input("State mission objective..."):
-        if not latest_job or st.session_state.get("new_mission"):
+        if not latest_job:
             subprocess.Popen(["powershell.exe", "-File", "scripts/gemini_orchestrator.ps1", "-Prompt", prompt, "-RepoRoot", str(REPO_ROOT)], creationflags=subprocess.CREATE_NEW_CONSOLE)
             st.toast("Mission Launched!", icon="🚀")
             time.sleep(2)
@@ -175,13 +203,15 @@ with tab_foundry:
     if latest_job:
         report_path = latest_job / "learning-summary.json"
         if report_path.exists():
-            report = json.loads(report_path.read_text(encoding="utf-8"))
-            st.metric("Avg Mission Score", f"{report.get('avg_score', 0)}/10")
-            
-            # Score Chart
-            df = pd.DataFrame(report.get("agent_scores", []))
-            if not df.empty:
-                st.bar_chart(df, x="agent_id", y="score")
+            try:
+                report = json.loads(report_path.read_text(encoding="utf-8"))
+                st.metric("Avg Mission Score", f"{report.get('avg_score', 0)}/10")
+                
+                # Score Chart
+                df = pd.DataFrame(report.get("agent_scores", []))
+                if not df.empty:
+                    st.bar_chart(df, x="agent_id", y="score")
+            except: pass
     
     st.markdown("---")
     st.markdown("### 📚 Role Library")
@@ -211,6 +241,8 @@ with tab_system:
     with col1:
         st.toggle("Autonomous Spawning", value=True, help="Allow Deputy to trigger Foundry")
         st.slider("Min Acceptance Score", 0, 10, 7)
+        if st.button("☢️ NUCLEAR RESET", type="primary", use_container_width=True, help="Stop all processes and restart core daemons"):
+            nuclear_reset()
     with col2:
         st.selectbox("Default Specialist Model", ["gemini-2.0-flash-exp", "gemini-1.5-pro"])
         st.selectbox("Deputy Inference Model", ["phi3:mini", "phi4"])
@@ -218,4 +250,3 @@ with tab_system:
 # Auto-Refresh
 time.sleep(5)
 st.rerun()
-

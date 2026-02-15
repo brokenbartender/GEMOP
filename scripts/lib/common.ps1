@@ -282,7 +282,7 @@ function Invoke-GeminiExternalCommand {
 
     [Parameter()]
     [ValidateRange(0, 86400)]
-    [int]$TimeoutSec = 0,
+    [int]$TimeoutSec = 300,
 
     [Parameter()]
     [switch]$ThrowOnNonZero,

@@ -1,0 +1,15 @@
+{
+  "type": "service_account",
+  "project_id": "brave-aileron-483703-f0",
+  "private_key_id": "d29fa3489043461a916309ae3b0ba8a6",
+  "private_key": "-----BEGIN PRIVATE KEY-----
+YOUR_PRIVATE_KEY_HERE
+-----END PRIVATE KEY-----
+",
+  "client_email": "vertex-express@brave-aileron-483703-f0.iam.gserviceaccount.com",
+  "client_id": "108[...]7",
+  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+  "token_uri": "https://oauth2.googleapis.com/token",
+  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/vertex-express%40brave-aileron-483703-f0.iam.gserviceaccount.com"
+}

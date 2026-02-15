@@ -1,0 +1,244 @@
+[2026-02-14T21:56:05.912056] START: Prompt=C:\Users\codym\gemini-op-clean\.agent-jobs\job-sovereign-ironclad-20260214-215550\prompt1.txt Output=C:\Users\codym\gemini-op-clean\.agent-jobs\job-sovereign-ironclad-20260214-215550\agent1.md
+[2026-02-14T21:56:05.918073] CALLING OLLAMA: phi4
+[2026-02-14T21:56:08.956133] START: Prompt=C:\Users\codym\gemini-op-clean\.agent-jobs\job-sovereign-ironclad-20260214-215550\prompt2.txt Output=C:\Users\codym\gemini-op-clean\.agent-jobs\job-sovereign-ironclad-20260214-215550\agent2.md
+[2026-02-14T21:56:08.958129] CALLING OLLAMA: phi4
+[2026-02-14T21:56:09.712868] START: Prompt=C:\Users\codym\gemini-op-clean\.agent-jobs\job-sovereign-ironclad-20260214-215550\prompt3.txt Output=C:\Users\codym\gemini-op-clean\.agent-jobs\job-sovereign-ironclad-20260214-215550\agent3.md
+[2026-02-14T21:56:09.720983] CALLING OLLAMA: phi4
+[2026-02-14T22:05:19.286917] START: Prompt=C:\Users\codym\gemini-op-clean\test_prompt.txt Output=C:\Users\codym\gemini-op-clean\test_out.md Model=ollama/phi4
+[2026-02-14T22:05:19.292956] CRITICAL EXCEPTION: 'utf-8' codec can't decode byte 0xff in position 0: invalid start byte
+[2026-02-14T22:05:40.276955] START: Prompt=C:\Users\codym\gemini-op-clean\test_prompt.txt Output=C:\Users\codym\gemini-op-clean\test_out.md Model=ollama/phi4
+[2026-02-14T22:05:40.276955] CALLING OLLAMA: phi4
+[2026-02-14T22:06:08.035608] CRITICAL EXCEPTION: HTTPConnectionPool(host='localhost', port=11434): Read timed out. (read timeout=600)
+[2026-02-14T22:06:11.065122] CRITICAL EXCEPTION: HTTPConnectionPool(host='localhost', port=11434): Read timed out. (read timeout=600)
+[2026-02-14T22:06:11.815803] CRITICAL EXCEPTION: HTTPConnectionPool(host='localhost', port=11434): Read timed out. (read timeout=600)
+[2026-02-14T22:09:47.366701] INFERENCE COMPLETE: 139 chars received
+[2026-02-14T22:09:47.369709] SUCCESS: Files written to C:\Users\codym\gemini-op-clean\test_out.md
+[2026-02-14T22:17:32.300136] START: Prompt=C:\Users\codym\gemini-op-clean\.agent-jobs\job-CONFIRMED-FINAL-20260214-221729\prompt1.txt Output=C:\Users\codym\gemini-op-clean\.agent-jobs\job-CONFIRMED-FINAL-20260214-221729\agent1.md
+[2026-02-14T22:17:32.300136] CALLING OLLAMA: phi4
+[2026-02-14T22:25:13.899319] INFERENCE COMPLETE: 2897 chars received
+[2026-02-14T22:25:13.901322] SUCCESS: Files written to C:\Users\codym\gemini-op-clean\.agent-jobs\job-CONFIRMED-FINAL-20260214-221729\agent1.md
+[2026-02-14T22:25:18.859229] START: Prompt=C:\Users\codym\gemini-op-clean\.agent-jobs\job-CONFIRMED-FINAL-20260214-221729\prompt2.txt Output=C:\Users\codym\gemini-op-clean\.agent-jobs\job-CONFIRMED-FINAL-20260214-221729\agent2.md
+[2026-02-14T22:25:18.860213] CALLING OLLAMA: phi3:mini
+[2026-02-14T22:31:09.342305] INFERENCE COMPLETE: 5078 chars received
+[2026-02-14T22:31:09.345303] SUCCESS: Files written to C:\Users\codym\gemini-op-clean\.agent-jobs\job-CONFIRMED-FINAL-20260214-221729\agent2.md
+[2026-02-14T22:31:14.868307] START: Prompt=C:\Users\codym\gemini-op-clean\.agent-jobs\job-CONFIRMED-FINAL-20260214-221729\prompt3.txt Output=C:\Users\codym\gemini-op-clean\.agent-jobs\job-CONFIRMED-FINAL-20260214-221729\agent3.md
+[2026-02-14T22:31:14.868307] CALLING OLLAMA: phi3:mini
+[2026-02-14T22:33:47.315196] INFERENCE COMPLETE: 1887 chars received
+[2026-02-14T22:33:47.317194] SUCCESS: Files written to C:\Users\codym\gemini-op-clean\.agent-jobs\job-CONFIRMED-FINAL-20260214-221729\agent3.md
+[2026-02-14T22:40:57.904206] ROUTING TO LOCAL OLLAMA: phi4
+[2026-02-14T22:40:58.001528] ROUTING TO LOCAL OLLAMA: phi3:mini
+[2026-02-14T22:40:58.001528] ROUTING TO LOCAL OLLAMA: phi3:mini
+[2026-02-14T22:45:28.286260] SUCCESS: C:\Users\codym\gemini-op-clean\.agent-jobs\job-FREE-FUSION-20260214-224054\agent3.md
+[2026-02-14T22:50:56.223604] SUCCESS: C:\Users\codym\gemini-op-clean\.agent-jobs\job-FREE-FUSION-20260214-224054\agent2.md
+[2026-02-14T22:54:13.234683] SUCCESS: C:\Users\codym\gemini-op-clean\.agent-jobs\job-FREE-FUSION-20260214-224054\agent1.md
+[2026-02-14T22:56:48.877422] ROUTING TO GROQ (Ultra-Speed)
+[2026-02-14T22:56:48.884839] ROUTING TO GROQ (Ultra-Speed)
+[2026-02-14T22:56:48.916453] ROUTING TO GROQ (Ultra-Speed)
+[2026-02-14T22:56:49.057596] ROUTING TO GEMINI CLOUD (High Reasoning)
+[2026-02-14T22:56:49.112691] ROUTING TO GEMINI CLOUD (High Reasoning)
+[2026-02-14T22:56:49.112691] ROUTING TO GEMINI CLOUD (High Reasoning)
+[2026-02-14T22:56:49.336021] ROUTING TO LOCAL OLLAMA: phi3:mini
+[2026-02-14T22:56:49.349761] ROUTING TO LOCAL OLLAMA: phi4
+[2026-02-14T23:00:54.974400] SUCCESS: C:\Users\codym\gemini-op-clean\.agent-jobs\job-SUPERCHARGED-20260214-225642\agent3.md
+[2026-02-14T23:03:52.462578] SUCCESS: C:\Users\codym\gemini-op-clean\.agent-jobs\job-SUPERCHARGED-20260214-225642\agent2.md
+[2026-02-14T23:05:32.755026] ROUTING TO GROQ (Ultra-Speed)
+[2026-02-14T23:05:32.964840] ROUTING TO GEMINI CLOUD (High Reasoning)
+[2026-02-14T23:05:33.209856] ROUTING TO LOCAL OLLAMA: phi3:mini
+[2026-02-14T23:05:33.422729] ROUTING TO GROQ (Ultra-Speed)
+[2026-02-14T23:05:33.670185] ROUTING TO GEMINI CLOUD (High Reasoning)
+[2026-02-14T23:05:33.686901] ROUTING TO GROQ (Ultra-Speed)
+[2026-02-14T23:05:33.894829] ROUTING TO GEMINI CLOUD (High Reasoning)
+[2026-02-14T23:05:33.928135] ROUTING TO LOCAL OLLAMA: phi3:mini
+[2026-02-14T23:05:34.151467] ROUTING TO LOCAL OLLAMA: phi3:mini
+[2026-02-14T23:06:31.033327] SUCCESS: C:\Users\codym\gemini-op-clean\.agent-jobs\job-SUPERCHARGED-20260214-225642\agent1.md
+[2026-02-14T23:09:29.101556] SUCCESS: C:\Users\codym\gemini-op-clean\.agent-jobs\job-SPEED-TUNED-20260214-230518\agent1.md
+[2026-02-14T23:12:01.467564] SUCCESS: C:\Users\codym\gemini-op-clean\.agent-jobs\job-SPEED-TUNED-20260214-230518\agent2.md
+[2026-02-14T23:15:20.066760] SUCCESS: C:\Users\codym\gemini-op-clean\.agent-jobs\job-SPEED-TUNED-20260214-230518\agent3.md
+[2026-02-14T23:25:16.700791] ROUTING TO GROQ (Ultra-Speed)
+[2026-02-14T23:25:16.949420] ROUTING TO GEMINI CLOUD (Tiered Inference)
+[2026-02-14T23:25:16.949420] Attempting Gemini Tier: gemini-1.5-pro-latest
+[2026-02-14T23:25:17.206062] Gemini Tier gemini-1.5-pro-latest failed: 404 Client Error: Not Found for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro-latest:generateContent?key=AIzaSyDbJWTyltojwqqvB9DujEjnB3tqxpmtm20. Falling back...
+[2026-02-14T23:25:17.207123] Attempting Gemini Tier: gemini-1.5-flash-latest
+[2026-02-14T23:25:17.423420] Gemini Tier gemini-1.5-flash-latest failed: 404 Client Error: Not Found for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=AIzaSyDbJWTyltojwqqvB9DujEjnB3tqxpmtm20. Falling back...
+[2026-02-14T23:25:17.423923] ROUTING TO LOCAL OLLAMA: phi3:mini
+[2026-02-14T23:27:50.280033] ROUTING TO GROQ (Ultra-Speed)
+[2026-02-14T23:27:50.566905] ROUTING TO GEMINI CLOUD (Tiered Inference)
+[2026-02-14T23:27:50.566905] Attempting Gemini Tier: gemini-pro
+[2026-02-14T23:27:50.844709] Gemini Tier gemini-pro failed: 404 Client Error: Not Found for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=AIzaSyDbJWTyltojwqqvB9DujEjnB3tqxpmtm20. Falling back...
+[2026-02-14T23:27:50.844709] Attempting Gemini Tier: gemini-1.5-flash-001
+[2026-02-14T23:27:51.063365] Gemini Tier gemini-1.5-flash-001 failed: 404 Client Error: Not Found for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-001:generateContent?key=AIzaSyDbJWTyltojwqqvB9DujEjnB3tqxpmtm20. Falling back...
+[2026-02-14T23:27:51.069707] ROUTING TO LOCAL OLLAMA: phi3:mini
+[2026-02-14T23:29:29.898948] SUCCESS: C:\Users\codym\gemini-op-clean\.agent-jobs\job-TIERED-FINAL-20260214-232513\agent1.md
+[2026-02-14T23:29:45.528930] ROUTING TO GROQ (Ultra-Speed)
+[2026-02-14T23:29:45.791113] ROUTING TO GEMINI CLOUD (Tiered Inference)
+[2026-02-14T23:29:45.791113] Attempting Gemini Tier: gemini-pro
+[2026-02-14T23:29:46.056543] Gemini Tier gemini-pro failed: 403 Client Error: Forbidden for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=AIzaSyBTqULUB5EtFQa6R2Gafb9zz8-6U0XImZk. Falling back...
+[2026-02-14T23:29:46.057535] Attempting Gemini Tier: gemini-1.5-flash-001
+[2026-02-14T23:29:46.319805] Gemini Tier gemini-1.5-flash-001 failed: 403 Client Error: Forbidden for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-001:generateContent?key=AIzaSyBTqULUB5EtFQa6R2Gafb9zz8-6U0XImZk. Falling back...
+[2026-02-14T23:29:46.319805] ROUTING TO LOCAL OLLAMA: phi3:mini
+[2026-02-14T23:32:48.791518] SUCCESS: C:\Users\codym\gemini-op-clean\.agent-jobs\job-CLOUD-HANDSHAKE-20260214-232737\agent1.md
+[2026-02-14T23:34:46.755539] ROUTING TO GROQ (Ultra-Speed)
+[2026-02-14T23:34:46.972809] ROUTING TO GEMINI CLOUD (Tiered Inference)
+[2026-02-14T23:34:46.972809] Attempting Gemini Tier: gemini-pro
+[2026-02-14T23:34:47.265404] Gemini Tier gemini-pro failed: 403 Client Error: Forbidden for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=AIzaSyBTqULUB5EtFQa6R2Gafb9zz8-6U0XImZk. Falling back...
+[2026-02-14T23:34:47.265918] Attempting Gemini Tier: gemini-1.5-flash-001
+[2026-02-14T23:34:47.467677] Gemini Tier gemini-1.5-flash-001 failed: 403 Client Error: Forbidden for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-001:generateContent?key=AIzaSyBTqULUB5EtFQa6R2Gafb9zz8-6U0XImZk. Falling back...
+[2026-02-14T23:34:47.468679] ROUTING TO LOCAL OLLAMA: phi3:mini
+[2026-02-14T23:35:21.353561] SUCCESS: C:\Users\codym\gemini-op-clean\.agent-jobs\job-DEFINITIVE-CLOUD-20260214-232936\agent1.md
+[2026-02-14T23:37:08.618330] SUCCESS: C:\Users\codym\gemini-op-clean\.agent-jobs\job-i5-STABLE-20260214-233435\agent1.md
+[2026-02-14T23:37:12.957622] ROUTING TO GROQ (Ultra-Speed)
+[2026-02-14T23:37:13.113691] ROUTING TO GEMINI CLOUD (Tiered Inference)
+[2026-02-14T23:37:13.113691] Attempting Gemini Tier: gemini-pro
+[2026-02-14T23:37:13.286992] Gemini Tier gemini-pro failed: 403 Client Error: Forbidden for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=AIzaSyBTqULUB5EtFQa6R2Gafb9zz8-6U0XImZk. Falling back...
+[2026-02-14T23:37:13.286992] Attempting Gemini Tier: gemini-1.5-flash-001
+[2026-02-14T23:37:13.471800] Gemini Tier gemini-1.5-flash-001 failed: 403 Client Error: Forbidden for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-001:generateContent?key=AIzaSyBTqULUB5EtFQa6R2Gafb9zz8-6U0XImZk. Falling back...
+[2026-02-14T23:37:13.471800] ROUTING TO LOCAL OLLAMA: phi3:mini
+[2026-02-14T23:39:44.693574] SUCCESS: C:\Users\codym\gemini-op-clean\.agent-jobs\job-i5-STABLE-20260214-233435\agent2.md
+[2026-02-14T23:39:48.577084] ROUTING TO GROQ (Ultra-Speed)
+[2026-02-14T23:39:48.726640] ROUTING TO GEMINI CLOUD (Tiered Inference)
+[2026-02-14T23:39:48.726640] Attempting Gemini Tier: gemini-pro
+[2026-02-14T23:39:48.974288] Gemini Tier gemini-pro failed: 403 Client Error: Forbidden for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=AIzaSyBTqULUB5EtFQa6R2Gafb9zz8-6U0XImZk. Falling back...
+[2026-02-14T23:39:48.974288] Attempting Gemini Tier: gemini-1.5-flash-001
+[2026-02-14T23:39:49.158090] Gemini Tier gemini-1.5-flash-001 failed: 403 Client Error: Forbidden for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-001:generateContent?key=AIzaSyBTqULUB5EtFQa6R2Gafb9zz8-6U0XImZk. Falling back...
+[2026-02-14T23:39:49.159129] ROUTING TO LOCAL OLLAMA: phi3:mini
+[2026-02-14T23:42:36.234553] SUCCESS: C:\Users\codym\gemini-op-clean\.agent-jobs\job-i5-STABLE-20260214-233435\agent3.md
+[2026-02-14T23:46:06.197414] ROUTING TO GROQ (Ultra-Speed)
+[2026-02-14T23:46:06.337214] ROUTING TO SAMBANOVA (High Power Llama-405B)
+[2026-02-14T23:46:07.021104] ROUTING TO CEREBRAS (Ultra-Fast Llama-70B)
+[2026-02-14T23:46:07.306701] ROUTING TO GEMINI CLOUD (Tiered Inference)
+[2026-02-14T23:46:07.306701] Attempting Gemini Tier: gemini-pro
+[2026-02-14T23:46:07.533676] Gemini Tier gemini-pro failed: 403 Client Error: Forbidden for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=AIzaSyBTqULUB5EtFQa6R2Gafb9zz8-6U0XImZk. Falling back...
+[2026-02-14T23:46:07.533676] Attempting Gemini Tier: gemini-1.5-flash-001
+[2026-02-14T23:46:07.746751] Gemini Tier gemini-1.5-flash-001 failed: 403 Client Error: Forbidden for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-001:generateContent?key=AIzaSyBTqULUB5EtFQa6R2Gafb9zz8-6U0XImZk. Falling back...
+[2026-02-14T23:46:07.746751] ROUTING TO LOCAL OLLAMA: phi3:mini
+[2026-02-14T23:48:03.107552] SUCCESS: C:\Users\codym\gemini-op-clean\.agent-jobs\job-HYPER-FUSION-20260214-234602\agent1.md
+[2026-02-14T23:52:24.956978] [VIGILANCE] Vigilance Sentinel Activated.
+[2026-02-14T23:54:18.363686] ROUTING TO GROQ (Ultra-Speed)
+[2026-02-14T23:54:18.602402] ROUTING TO SAMBANOVA (High Power Llama-405B)
+[2026-02-14T23:54:19.187274] ROUTING TO CEREBRAS (Ultra-Fast Llama-70B)
+[2026-02-14T23:54:19.387811] ROUTING TO GEMINI CLOUD (Tiered Inference)
+[2026-02-14T23:54:19.387811] Attempting Gemini Tier: gemini-pro
+[2026-02-14T23:54:19.622259] Gemini Tier gemini-pro failed: 403 Client Error: Forbidden for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=AIzaSyBTqULUB5EtFQa6R2Gafb9zz8-6U0XImZk. Falling back...
+[2026-02-14T23:54:19.622259] Attempting Gemini Tier: gemini-1.5-flash-001
+[2026-02-14T23:54:19.834851] Gemini Tier gemini-1.5-flash-001 failed: 403 Client Error: Forbidden for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-001:generateContent?key=AIzaSyBTqULUB5EtFQa6R2Gafb9zz8-6U0XImZk. Falling back...
+[2026-02-14T23:54:19.835852] ROUTING TO LOCAL OLLAMA: phi3:mini
+[2026-02-14T23:57:24.505781] SUCCESS: C:\Users\codym\gemini-op-clean\.agent-jobs\job-VIGILANCE-FINAL-20260214-235415\agent1.md
+[2026-02-14T23:57:39.547086] ROUTING TO GROQ (Ultra-Speed)
+[2026-02-14T23:57:39.700544] ROUTING TO SAMBANOVA (High Power Llama-405B)
+[2026-02-14T23:57:40.284799] ROUTING TO CEREBRAS (Ultra-Fast Llama-70B)
+[2026-02-14T23:57:40.486919] ROUTING TO GEMINI CLOUD (Tiered Inference)
+[2026-02-14T23:57:40.486919] Attempting Gemini Tier: gemini-pro
+[2026-02-14T23:57:40.704974] Gemini Tier gemini-pro failed: 403 Client Error: Forbidden for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=AIzaSyBTqULUB5EtFQa6R2Gafb9zz8-6U0XImZk. Falling back...
+[2026-02-14T23:57:40.704974] Attempting Gemini Tier: gemini-1.5-flash-001
+[2026-02-14T23:57:40.888925] Gemini Tier gemini-1.5-flash-001 failed: 403 Client Error: Forbidden for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-001:generateContent?key=AIzaSyBTqULUB5EtFQa6R2Gafb9zz8-6U0XImZk. Falling back...
+[2026-02-14T23:57:40.888925] ROUTING TO LOCAL OLLAMA: phi3:mini
+[2026-02-15T00:00:49.482741] SUCCESS: C:\Users\codym\gemini-op-clean\.agent-jobs\job-VIGILANCE-FINAL-20260214-235735\agent1.md
+[2026-02-15T00:02:48.723851] ROUTING TO GROQ (Ultra-Speed)
+[2026-02-15T00:02:48.880332] ROUTING TO SAMBANOVA (High Power Llama-405B)
+[2026-02-15T00:02:49.565467] ROUTING TO CEREBRAS (Ultra-Fast Llama-70B)
+[2026-02-15T00:02:49.868000] ROUTING TO GEMINI CLOUD (Tiered Inference)
+[2026-02-15T00:02:49.868975] Attempting Gemini Tier: gemini-pro
+[2026-02-15T00:02:50.087683] Gemini Tier gemini-pro failed: 403 Client Error: Forbidden for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=AIzaSyBTqULUB5EtFQa6R2Gafb9zz8-6U0XImZk. Falling back...
+[2026-02-15T00:02:50.088689] Attempting Gemini Tier: gemini-1.5-flash-001
+[2026-02-15T00:02:50.314890] Gemini Tier gemini-1.5-flash-001 failed: 403 Client Error: Forbidden for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-001:generateContent?key=AIzaSyBTqULUB5EtFQa6R2Gafb9zz8-6U0XImZk. Falling back...
+[2026-02-15T00:02:50.314890] ROUTING TO LOCAL OLLAMA: phi3:mini
+[2026-02-15T00:05:56.237297] ROUTING TO GROQ (Ultra-Speed)
+[2026-02-15T00:05:56.408194] ROUTING TO SAMBANOVA (High Power Llama-405B)
+[2026-02-15T00:05:57.119712] ROUTING TO CEREBRAS (Ultra-Fast Llama-70B)
+[2026-02-15T00:05:57.394214] ROUTING TO GEMINI CLOUD (Tiered Inference)
+[2026-02-15T00:05:57.394214] Attempting Gemini Tier: gemini-pro
+[2026-02-15T00:05:57.627130] Gemini Tier gemini-pro failed: 403 Client Error: Forbidden for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=AIzaSyBTqULUB5EtFQa6R2Gafb9zz8-6U0XImZk. Falling back...
+[2026-02-15T00:05:57.629144] Attempting Gemini Tier: gemini-1.5-flash-001
+[2026-02-15T00:05:57.856989] Gemini Tier gemini-1.5-flash-001 failed: 403 Client Error: Forbidden for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-001:generateContent?key=AIzaSyBTqULUB5EtFQa6R2Gafb9zz8-6U0XImZk. Falling back...
+[2026-02-15T00:05:57.859003] ROUTING TO LOCAL OLLAMA: phi3:mini
+[2026-02-15T00:06:42.091418] SUCCESS: C:\Users\codym\gemini-op-clean\.agent-jobs\job-FORGE-CONFIRM-20260215-000244\agent1.md
+[2026-02-15T00:09:37.830801] SUCCESS: C:\Users\codym\gemini-op-clean\.agent-jobs\job-FORGE-DEFINITIVE-20260215-000548\agent1.md
+[2026-02-15T00:14:35.955422] ROUTING TO GROQ (Ultra-Speed)
+[2026-02-15T00:14:36.223026] ROUTING TO SAMBANOVA (High Power Llama-405B)
+[2026-02-15T00:15:56.902386] ROUTING TO CEREBRAS (Ultra-Fast Llama-70B)
+[2026-02-15T00:15:57.118859] ROUTING TO GEMINI CLOUD (Tiered Inference)
+[2026-02-15T00:15:57.118859] Attempting Gemini Tier: gemini-pro
+[2026-02-15T00:15:57.353078] Gemini Tier gemini-pro failed: 403 Client Error: Forbidden for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=AIzaSyBTqULUB5EtFQa6R2Gafb9zz8-6U0XImZk. Falling back...
+[2026-02-15T00:15:57.353078] Attempting Gemini Tier: gemini-1.5-flash-001
+[2026-02-15T00:15:57.536543] Gemini Tier gemini-1.5-flash-001 failed: 403 Client Error: Forbidden for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-001:generateContent?key=AIzaSyBTqULUB5EtFQa6R2Gafb9zz8-6U0XImZk. Falling back...
+[2026-02-15T00:15:57.536543] ROUTING TO LOCAL OLLAMA: phi3:mini
+[2026-02-15T00:18:52.570582] SUCCESS: C:\Users\codym\gemini-op-clean\.agent-jobs\job-SOVEREIGN-CONFIRMED-20260215-001432\agent1.md
+[2026-02-15T00:26:22.307292] ROUTING TO GROQ (Ultra-Speed)
+[2026-02-15T00:26:22.537611] ROUTING TO SAMBANOVA (High Power Llama-405B)
+[2026-02-15T00:26:23.058519] ROUTING TO CEREBRAS (Ultra-Fast Llama-70B)
+[2026-02-15T00:26:23.339164] ROUTING TO GEMINI CLOUD (Tiered Inference)
+[2026-02-15T00:26:23.340159] Attempting Gemini Tier: gemini-pro
+[2026-02-15T00:26:23.542865] Gemini Tier gemini-pro failed: 403 Client Error: Forbidden for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=AIzaSyBTqULUB5EtFQa6R2Gafb9zz8-6U0XImZk. Falling back...
+[2026-02-15T00:26:23.542865] Attempting Gemini Tier: gemini-1.5-flash-001
+[2026-02-15T00:26:23.722868] Gemini Tier gemini-1.5-flash-001 failed: 403 Client Error: Forbidden for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-001:generateContent?key=AIzaSyBTqULUB5EtFQa6R2Gafb9zz8-6U0XImZk. Falling back...
+[2026-02-15T00:26:23.723868] ROUTING TO LOCAL OLLAMA: phi3:mini
+[2026-02-15T00:31:19.573993] SUCCESS: C:\Users\codym\gemini-op-clean\.agent-jobs\job-POST-UPDATE-CANARY-20260215-002618\agent1.md
+[2026-02-15T00:41:27.552081] ROUTING TO GROQ (Ultra-Speed)
+[2026-02-15T00:41:27.753788] ROUTING TO SAMBANOVA (High Power Llama-405B)
+[2026-02-15T00:41:28.333004] ROUTING TO CEREBRAS (Ultra-Fast Llama-70B)
+[2026-02-15T00:41:28.648266] ROUTING TO GEMINI CLOUD (Tiered Inference)
+[2026-02-15T00:41:28.648266] Attempting Gemini Tier: gemini-pro
+[2026-02-15T00:41:28.865736] Gemini Tier gemini-pro failed: 403 Client Error: Forbidden for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=AIzaSyBTqULUB5EtFQa6R2Gafb9zz8-6U0XImZk. Falling back...
+[2026-02-15T00:41:28.865736] Attempting Gemini Tier: gemini-1.5-flash-001
+[2026-02-15T00:41:29.080615] Gemini Tier gemini-1.5-flash-001 failed: 403 Client Error: Forbidden for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-001:generateContent?key=AIzaSyBTqULUB5EtFQa6R2Gafb9zz8-6U0XImZk. Falling back...
+[2026-02-15T00:41:29.080615] ROUTING TO LOCAL OLLAMA: phi3:mini
+[2026-02-15T00:44:07.415449] ROUTING TO GROQ (Ultra-Speed)
+[2026-02-15T00:44:07.659058] Groq failed: 400 Client Error: Bad Request for url: https://api.groq.com/openai/v1/chat/completions
+[2026-02-15T00:44:07.661075] ROUTING TO SAMBANOVA (High Power Llama-405B)
+[2026-02-15T00:44:08.351536] ROUTING TO CEREBRAS (Ultra-Fast Llama-70B)
+[2026-02-15T00:44:08.657246] ROUTING TO GEMINI CLOUD (Tiered Inference)
+[2026-02-15T00:44:08.658265] Attempting Gemini Tier: gemini-pro
+[2026-02-15T00:44:08.906754] Gemini Tier gemini-pro failed: 403 Client Error: Forbidden for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=AIzaSyBTqULUB5EtFQa6R2Gafb9zz8-6U0XImZk. Falling back...
+[2026-02-15T00:44:08.908770] Attempting Gemini Tier: gemini-1.5-flash-001
+[2026-02-15T00:44:09.196928] Gemini Tier gemini-1.5-flash-001 failed: 403 Client Error: Forbidden for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-001:generateContent?key=AIzaSyBTqULUB5EtFQa6R2Gafb9zz8-6U0XImZk. Falling back...
+[2026-02-15T00:44:09.198938] ROUTING TO LOCAL OLLAMA: phi3:mini
+[2026-02-15T00:46:23.410131] ROUTING TO GROQ (Ultra-Speed)
+[2026-02-15T00:46:23.622520] Groq failed: 400 Client Error: Bad Request for url: https://api.groq.com/openai/v1/chat/completions
+[2026-02-15T00:46:23.624533] ROUTING TO SAMBANOVA (High Power Llama-405B)
+[2026-02-15T00:46:24.279822] ROUTING TO CEREBRAS (Ultra-Fast Llama-70B)
+[2026-02-15T00:46:24.475010] ROUTING TO GEMINI CLOUD (Tiered Inference)
+[2026-02-15T00:46:24.475010] Attempting Gemini Tier: gemini-pro
+[2026-02-15T00:46:24.693149] Gemini Tier gemini-pro failed: 403 Client Error: Forbidden for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=AIzaSyBTqULUB5EtFQa6R2Gafb9zz8-6U0XImZk. Falling back...
+[2026-02-15T00:46:24.693149] Attempting Gemini Tier: gemini-1.5-flash-001
+[2026-02-15T00:46:24.912150] Gemini Tier gemini-1.5-flash-001 failed: 403 Client Error: Forbidden for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-001:generateContent?key=AIzaSyBTqULUB5EtFQa6R2Gafb9zz8-6U0XImZk. Falling back...
+[2026-02-15T00:46:24.913219] ROUTING TO LOCAL OLLAMA: phi3:mini
+[2026-02-15T00:47:27.968014] SUCCESS: C:\Users\codym\gemini-op-clean\.agent-jobs\job-GROQ-CONFIRMED-20260215-004123\agent1.md
+[2026-02-15T00:49:16.362233] SUCCESS: C:\Users\codym\gemini-op-clean\.agent-jobs\job-GROQ-PRIORITY-20260215-004350\agent1.md
+[2026-02-15T00:49:54.307919] ROUTING TO GROQ (Ultra-Speed)
+[2026-02-15T00:49:54.507347] Groq failed: 400 Client Error: Bad Request for url: https://api.groq.com/openai/v1/chat/completions
+[2026-02-15T00:49:54.509350] ROUTING TO SAMBANOVA (High Power Llama-405B)
+[2026-02-15T00:49:55.262223] ROUTING TO CEREBRAS (Ultra-Fast Llama-70B)
+[2026-02-15T00:49:55.642400] ROUTING TO GEMINI CLOUD (Tiered Inference)
+[2026-02-15T00:49:55.643446] Attempting Gemini Tier: gemini-pro
+[2026-02-15T00:49:55.921731] Gemini Tier gemini-pro failed: 403 Client Error: Forbidden for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=AIzaSyBTqULUB5EtFQa6R2Gafb9zz8-6U0XImZk. Falling back...
+[2026-02-15T00:49:55.922744] Attempting Gemini Tier: gemini-1.5-flash-001
+[2026-02-15T00:49:56.118981] Gemini Tier gemini-1.5-flash-001 failed: 403 Client Error: Forbidden for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-001:generateContent?key=AIzaSyBTqULUB5EtFQa6R2Gafb9zz8-6U0XImZk. Falling back...
+[2026-02-15T00:49:56.119984] ROUTING TO LOCAL OLLAMA: phi3:mini
+[2026-02-15T00:50:47.409447] SUCCESS: C:\Users\codym\gemini-op-clean\.agent-jobs\job-GROQ-DEFINITIVE-20260215-004616\agent1.md
+[2026-02-15T00:54:24.553035] ROUTING TO GROQ (Ultra-Speed)
+[2026-02-15T00:54:24.842412] Groq failed: 400 Client Error: Bad Request for url: https://api.groq.com/openai/v1/chat/completions
+[2026-02-15T00:54:24.845459] ROUTING TO SAMBANOVA (High Power Llama-405B)
+[2026-02-15T00:54:25.444324] ROUTING TO CEREBRAS (Ultra-Fast Llama-70B)
+[2026-02-15T00:54:25.629201] ROUTING TO GEMINI CLOUD (Tiered Inference)
+[2026-02-15T00:54:25.629201] Attempting Gemini Tier: gemini-pro
+[2026-02-15T00:54:25.824859] Gemini Tier gemini-pro failed: 403 Client Error: Forbidden for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=AIzaSyBTqULUB5EtFQa6R2Gafb9zz8-6U0XImZk. Falling back...
+[2026-02-15T00:54:25.824859] Attempting Gemini Tier: gemini-1.5-flash-001
+[2026-02-15T00:54:26.051394] Gemini Tier gemini-1.5-flash-001 failed: 403 Client Error: Forbidden for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-001:generateContent?key=AIzaSyBTqULUB5EtFQa6R2Gafb9zz8-6U0XImZk. Falling back...
+[2026-02-15T00:54:26.052394] ROUTING TO LOCAL OLLAMA: phi3:mini
+[2026-02-15T00:55:44.000626] SUCCESS: C:\Users\codym\gemini-op-clean\.agent-jobs\job-GROQ-DEFINITIVE-FINAL-20260215-004938\agent1.md
+[2026-02-15T00:57:37.302953] ROUTING TO GROQ (Ultra-Speed)
+[2026-02-15T00:57:37.502105] Groq failed: 400 Client Error: Bad Request for url: https://api.groq.com/openai/v1/chat/completions
+[2026-02-15T00:57:37.504126] ROUTING TO SAMBANOVA (High Power Llama-405B)
+[2026-02-15T00:57:38.079085] ROUTING TO CEREBRAS (Ultra-Fast Llama-70B)
+[2026-02-15T00:57:38.349501] ROUTING TO GEMINI CLOUD (Tiered Inference)
+[2026-02-15T00:57:38.350501] Attempting Gemini Tier: gemini-pro
+[2026-02-15T00:57:38.601226] Gemini Tier gemini-pro failed: 403 Client Error: Forbidden for url: https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent?key=AIzaSyBTqULUB5EtFQa6R2Gafb9zz8-6U0XImZk. Falling back...
+[2026-02-15T00:57:38.601226] Attempting Gemini Tier: gemini-1.5-flash-001
+[2026-02-15T00:57:38.823830] Gemini Tier gemini-1.5-flash-001 failed: 403 Client Error: Forbidden for url: https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash-001:generateContent?key=AIzaSyBTqULUB5EtFQa6R2Gafb9zz8-6U0XImZk. Falling back...
+[2026-02-15T00:57:38.823830] ROUTING TO LOCAL OLLAMA: phi3:mini
+[2026-02-15T00:57:56.395871] SUCCESS: C:\Users\codym\gemini-op-clean\.agent-jobs\job-VERTEX-ENABLED-20260215-005418\agent1.md
+[2026-02-15T01:00:39.226262] SUCCESS: C:\Users\codym\gemini-op-clean\.agent-jobs\job-DUAL-CLOUD-FIX-20260215-005728\agent1.md
+[2026-02-15T01:34:24.794086] SUCCESS: Gemini configured with Service Account.
+[2026-02-15T01:34:24.794086] ROUTING TO GEMINI CLOUD (SDK / Service Account)
+[2026-02-15T01:34:24.972347] Gemini SDK failed: 404 models/gemini-pro is not found for API version v1beta, or is not supported for generateContent. Call ListModels to see the list of available models and their supported methods.
+[2026-02-15T01:34:24.972347] ROUTING TO LOCAL OLLAMA: phi3:mini
