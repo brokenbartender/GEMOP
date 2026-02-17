@@ -815,6 +815,12 @@ function Generate-RunScaffold {
       $facts = "[UNIVERSAL FACT SHEET]`r`n$facts`r`n`r`n"
     }
 
+    $retrieval = Read-Text (Join-Path $RunDir ("state\\retrieval_pack_round{0}.md" -f $RoundNumber))
+    if ($retrieval) {
+      if ($retrieval.Length -gt 12000) { $retrieval = $retrieval.Substring(0, 12000) }
+      $retrieval = "[RETRIEVAL PACK - SPECIALIZED RETRIEVERS]`r`n$retrieval`r`n`r`n"
+    }
+
     $sources = Read-Text (Join-Path $RunDir "state\\sources.md")
     if ($sources) {
       if ($sources.Length -gt 4000) { $sources = $sources.Substring(0, 4000) }
@@ -924,7 +930,7 @@ $pt
     }
 
     $body = @"
- $facts$world$sources$skills$anchor$lessons$header
+ $facts$retrieval$world$sources$skills$anchor$lessons$header
  $cap$supervisorMemo$ownerBlock$onto$misinfo$adv$poison
  [OPERATIONAL CONTEXT]
  REPO_ROOT: $RepoRoot
@@ -1587,6 +1593,17 @@ if ($existingRunnerScripts -and $existingRunnerScripts.Count -gt 0) {
         }
       }
       Ensure-SkillPack -RepoRoot $RepoRoot -RunDir $RunDir -Prompt $Prompt -MaxSkills $MaxSkills -SkillCharBudget $SkillCharBudget -IncludeSkillsCsv $includeCsv
+    }
+
+    # Multi-retriever context pack (bounded): code + docs + memory hits for this task.
+    try {
+      $rp = Join-Path $RepoRoot "scripts\\retrieval_pack.py"
+      if (Test-Path -LiteralPath $rp) {
+        & python $rp --repo-root $RepoRoot --run-dir $RunDir --round $r --query $Prompt --max-per-section 20 | Out-Null
+        Write-OrchLog -RunDir $RunDir -Msg ("retrieval_pack_written round={0}" -f $r)
+      }
+    } catch {
+      try { Write-OrchLog -RunDir $RunDir -Msg ("retrieval_pack_failed round={0} error={1}" -f $r, $_.Exception.Message) } catch { }
     }
 
     Generate-RunScaffold -RepoRoot $RepoRoot -RunDir $RunDir -Prompt $Prompt -TeamCsv $Team -Agents $Agents -CouncilPattern $CouncilPattern -InjectLearningHints:$InjectLearningHints -InjectCapabilityContract:$InjectCapabilityContract -AdversaryIds $adversaryIds -AdversaryMode $AdversaryMode -PoisonPath $PoisonPath -PoisonAgent $PoisonAgent -Ontology $Ontology -OntologyOverrideAgent $OntologyOverrideAgent -OntologyOverride $OntologyOverride -MisinformAgent $MisinformAgent -MisinformText $MisinformText -RoundNumber $r

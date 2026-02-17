@@ -15,8 +15,15 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-$repoRoot = 'C:\Gemini'
+$repoRoot = ($env:GEMINI_OP_REPO_ROOT)
+if ([string]::IsNullOrWhiteSpace($repoRoot)) {
+  $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+}
+
 $venvPy = Join-Path $repoRoot '.venv\Scripts\python.exe'
+if (!(Test-Path $venvPy)) {
+  $venvPy = 'python'
+}
 $pullResources = Join-Path $repoRoot 'scripts\pull-resources.ps1'
 $extractDocs = Join-Path $repoRoot 'scripts\extract-docs.py'
 $notesRaw = Join-Path $repoRoot 'ramshare\notes\raw'

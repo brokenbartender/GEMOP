@@ -70,6 +70,12 @@ TOOLS: List[Dict[str, Any]] = [
         "desc": "Scores prior runs for contract compliance + failure signals.",
     },
     {
+        "id": "retrieval_pack",
+        "kind": "retrieval",
+        "path": "scripts/retrieval_pack.py",
+        "desc": "Bounded multi-retriever pack (code/docs/memory) injected into prompts.",
+    },
+    {
         "id": "killswitch",
         "kind": "safety",
         "path": "scripts/killswitch.py",
@@ -114,4 +120,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

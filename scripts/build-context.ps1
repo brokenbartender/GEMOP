@@ -2,15 +2,23 @@ param(
   [Parameter(Mandatory = $true)]
   [string]$Query,
 
+  [string]$RepoRoot = "",
+
   [int]$MaxMatches = 25
 )
 
 $ErrorActionPreference = 'Stop'
 
-$repoRoot = 'C:\Gemini'
-$out = Join-Path $repoRoot 'ramshare\learning\context\current.md'
-$distilled = Join-Path $repoRoot 'ramshare\notes\distilled'
-$raw = Join-Path $repoRoot 'ramshare\notes\raw'
+if ([string]::IsNullOrWhiteSpace($RepoRoot)) {
+  $RepoRoot = ($env:GEMINI_OP_REPO_ROOT)
+}
+if ([string]::IsNullOrWhiteSpace($RepoRoot)) {
+  $RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+}
+
+$out = Join-Path $RepoRoot 'ramshare\learning\context\current.md'
+$distilled = Join-Path $RepoRoot 'ramshare\notes\distilled'
+$raw = Join-Path $RepoRoot 'ramshare\notes\raw'
 
 New-Item -ItemType Directory -Force -Path (Split-Path -Parent $out) | Out-Null
 

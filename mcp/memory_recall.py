@@ -12,26 +12,32 @@ def recall(query):
     print(f"?? RECALL: Searching memory for '{query}'...")
     memory_hits = []
     
-    # 1. Search LESSONS.md
-    lessons_path = REPO_ROOT / "knowledge" / "LESSONS.md"
+    # 1. Search lessons (ramshare memory)
+    lessons_path = REPO_ROOT / "ramshare" / "learning" / "memory" / "lessons.md"
     if lessons_path.exists():
         text = lessons_path.read_text(encoding="utf-8")
         # Simple keyword matching for local context
         if any(word.lower() in text.lower() for word in query.split()):
             memory_hits.append(f"--- FROM LESSONS.MD ---\n{text[:1000]}")
 
-    # 2. Search recent plan.json files
+    # 2. Search recent run manifests / decisions (cheap, deterministic)
     jobs_dir = REPO_ROOT / ".agent-jobs"
     if jobs_dir.exists():
         recent_jobs = sorted([d for d in jobs_dir.iterdir() if d.is_dir()], key=os.path.getmtime, reverse=True)[:10]
         for job in recent_jobs:
-            plan = job / "state" / "plan.json"
-            if plan.exists():
+            for p in [
+                job / "state" / "manifest.json",
+                job / "state" / "decisions_round1.json",
+                job / "state" / "world_state.md",
+            ]:
+                if not p.exists():
+                    continue
                 try:
-                    data = json.loads(plan.read_text(encoding="utf-8"))
-                    if any(word.lower() in str(data).lower() for word in query.split()):
-                        memory_hits.append(f"--- PAST SUCCESSFUL PLAN ({job.name}) ---\n{data.get('summary')}")
-                except: pass
+                    blob = p.read_text(encoding="utf-8", errors="ignore")
+                    if any(word.lower() in blob.lower() for word in query.split()):
+                        memory_hits.append(f"--- HIT ({job.name}) {p.name} ---\n{blob[:800]}")
+                except Exception:
+                    pass
 
     if not memory_hits:
         return "No specific previous patterns found. Procedural logic from scratch required."
