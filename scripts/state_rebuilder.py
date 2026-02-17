@@ -171,6 +171,74 @@ def build_world_state(run_dir: Path, round_n: int) -> str:
     return "\n".join(lines).strip() + "\n"
 
 
+def _build_round_digest(run_dir: Path, round_n: int) -> str:
+    state_dir = run_dir / "state"
+    dec = safe_read_text(state_dir / f"decisions_round{round_n}.json", max_bytes=120_000).strip()
+    sup = safe_read_text(state_dir / f"supervisor_round{round_n}.json", max_bytes=120_000).strip()
+    cards = safe_read_text(state_dir / f"agent_cards_round{round_n}.json", max_bytes=120_000).strip()
+    verify = safe_read_text(state_dir / "verify_report.json", max_bytes=120_000).strip()
+
+    lines: list[str] = []
+    lines.append("# Round Digest")
+    lines.append("")
+    lines.append(f"generated_at: {time.time()}")
+    lines.append(f"round: {round_n}")
+    lines.append("")
+
+    if dec:
+        lines.append("## Decisions (Summary)")
+        try:
+            obj = json.loads(dec)
+            lines.append("```json")
+            lines.append(json.dumps({k: obj.get(k) for k in ("ok", "missing", "invalid", "extracted", "agent_count")}, indent=2))
+            lines.append("```")
+        except Exception:
+            lines.append("```json")
+            lines.append((dec[-8000:] if len(dec) > 8000 else dec))
+            lines.append("```")
+        lines.append("")
+
+    if cards:
+        lines.append("## Agent Cards (Roles/Tiers)")
+        try:
+            obj = json.loads(cards)
+            roles = []
+            for c in obj.get("cards", []) if isinstance(obj, dict) else []:
+                if not isinstance(c, dict):
+                    continue
+                roles.append(
+                    {
+                        "agent_id": c.get("agent_id"),
+                        "role": c.get("role"),
+                        "tier": ((c.get("service_router") or {}) if isinstance(c.get("service_router"), dict) else {}).get("tier"),
+                    }
+                )
+            lines.append("```json")
+            lines.append(json.dumps(roles, indent=2))
+            lines.append("```")
+        except Exception:
+            pass
+        lines.append("")
+
+    if sup:
+        lines.append("## Supervisor (Tail)")
+        tail = sup[-12_000:] if len(sup) > 12_000 else sup
+        lines.append("```json")
+        lines.append(tail.strip())
+        lines.append("```")
+        lines.append("")
+
+    if verify:
+        lines.append("## Verify Report (Tail)")
+        tail = verify[-12_000:] if len(verify) > 12_000 else verify
+        lines.append("```json")
+        lines.append(tail.strip())
+        lines.append("```")
+        lines.append("")
+
+    return "\n".join(lines).strip() + "\n"
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="Rebuild drift-resistant world state artifact for long/blackout runs.")
     ap.add_argument("--run-dir", required=True)
@@ -192,6 +260,12 @@ def main() -> int:
 
     out = build_world_state(run_dir, round_n)
     (state_dir / "world_state.md").write_text(out, encoding="utf-8")
+
+    # Round digest (compaction): small, stable, and meant to be injected instead of raw logs.
+    try:
+        (state_dir / f"round{round_n}_digest.md").write_text(_build_round_digest(run_dir, round_n), encoding="utf-8")
+    except Exception:
+        pass
     print(json.dumps({"ok": True, "path": str(state_dir / "world_state.md"), "round": round_n}, indent=2))
     return 0
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import re
@@ -151,6 +152,65 @@ def read_json(path: Path) -> Any:
         return None
 
 
+def _has_approval(run_dir: Path, *, action_id: str, kind: str) -> bool:
+    p = run_dir / "state" / "approvals.jsonl"
+    if not p.exists():
+        return False
+    aid = str(action_id or "").strip()
+    if not aid:
+        return False
+    k = str(kind or "").strip()
+    try:
+        for ln in p.read_text(encoding="utf-8", errors="ignore").splitlines():
+            ln = (ln or "").strip()
+            if not ln:
+                continue
+            try:
+                obj = json.loads(ln)
+            except Exception:
+                continue
+            if not isinstance(obj, dict):
+                continue
+            if str(obj.get("action_id") or "").strip() != aid:
+                continue
+            if k and str(obj.get("kind") or "").strip() != k:
+                continue
+            return True
+    except Exception:
+        return False
+    return False
+
+
+def _write_approval_request(run_dir: Path, *, round_n: int, action_id: str, kind: str, details: dict) -> None:
+    state_dir = run_dir / "state"
+    state_dir.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "schema_version": 1,
+        "generated_at": time.time(),
+        "round": int(round_n),
+        "action_id": str(action_id),
+        "kind": str(kind),
+        "details": details,
+        "how_to_approve": {
+            "command": f'python scripts/approve_action.py --run-dir "{run_dir}" --action-id "{action_id}" --kind "{kind}" --actor human --note "approved"',
+            "artifact": "state/approvals.jsonl",
+        },
+    }
+    (state_dir / f"approval_request_round{int(round_n)}.json").write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    md = []
+    md.append("# Approval Required")
+    md.append("")
+    md.append(f"round: {payload['round']}")
+    md.append(f"kind: {payload['kind']}")
+    md.append(f"action_id: {payload['action_id']}")
+    md.append("")
+    md.append("## How To Approve")
+    md.append("```")
+    md.append(payload["how_to_approve"]["command"])
+    md.append("```")
+    (state_dir / f"approval_request_round{int(round_n)}.md").write_text("\n".join(md).strip() + "\n", encoding="utf-8")
+
+
 def load_decision(run_dir: Path, round_n: int, agent_id: int) -> dict[str, Any] | None:
     p = run_dir / "state" / "decisions" / f"round{int(round_n)}_agent{int(agent_id)}.json"
     obj = read_json(p)
@@ -209,6 +269,9 @@ def main() -> int:
     ap.add_argument("--verify", action="store_true", help="Run lightweight verification after apply.")
     ap.add_argument("--require-decision-files", action="store_true", help="Fail if DECISION_JSON files list is missing or does not cover touched files.")
     ap.add_argument("--require-diff-blocks", action="store_true", help="Fail if no ```diff blocks are present in the chosen agent output.")
+    ap.add_argument("--require-approval", action="store_true", help="Require an explicit approval record before applying patches.")
+    ap.add_argument("--approval-kind", default="patch_apply", help="Approval kind label (default: patch_apply).")
+    ap.add_argument("--require-grounding", action="store_true", help="Require at least one repo file-path citation in the chosen agent output.")
     args = ap.parse_args()
 
     repo_root = Path(args.repo_root).resolve()
@@ -231,6 +294,7 @@ def main() -> int:
     out_path, out_txt = load_agent_output(run_dir, round_n, agent_id)
     decision = load_decision(run_dir, round_n, agent_id)
     decision_files = _norm_list(list((decision or {}).get("files") or []))
+    validation_ok = bool((decision or {}).get("validation_ok", True))
 
     # Reuse supervisor guardrail weakening scan (do not auto-apply shadow code).
     try:
@@ -261,11 +325,83 @@ def main() -> int:
     # Apply each fenced diff block independently; this makes rollback and reporting safer.
     blocks = [b.strip("\n") for b in diff_blocks if b.strip()]
 
+    patch_blob = "\n\n".join([b.strip() for b in blocks if (b or "").strip()])
+    action_id = hashlib.sha256(
+        ("\n".join([str(repo_root), str(run_dir), str(round_n), str(agent_id), patch_blob])).encode("utf-8", errors="ignore")
+    ).hexdigest()
+
+    if args.require_grounding:
+        cited = set(re.findall(r"(?im)\b(?:docs|scripts|mcp|configs|agents)/[a-z0-9_./\\-]+\b", out_txt or ""))
+        cited_ok = False
+        for c in cited:
+            p = _norm_path(c)
+            if not p:
+                continue
+            try:
+                (repo_root / p).resolve().relative_to(repo_root.resolve())
+            except Exception:
+                continue
+            if (repo_root / p).exists():
+                cited_ok = True
+                break
+        if not cited_ok:
+            payload = {
+                "ok": False,
+                "reason": "grounding_required_missing_citations",
+                "round": round_n,
+                "agent": agent_id,
+                "output_path": str(out_path),
+                "action_id": action_id,
+            }
+            (state_dir / f"patch_apply_round{round_n}.json").write_text(json.dumps(payload, indent=2), encoding="utf-8")
+            return 5
+
+    if args.require_approval and not _has_approval(run_dir, action_id=action_id, kind=str(args.approval_kind)):
+        _write_approval_request(
+            run_dir,
+            round_n=round_n,
+            action_id=action_id,
+            kind=str(args.approval_kind),
+            details={"agent": agent_id, "output_path": str(out_path)},
+        )
+        payload = {
+            "ok": False,
+            "reason": "approval_required",
+            "round": round_n,
+            "agent": agent_id,
+            "output_path": str(out_path),
+            "action_id": action_id,
+            "approval_kind": str(args.approval_kind),
+        }
+        (state_dir / f"patch_apply_round{round_n}.json").write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        return 4
+
+    # Stronger idempotency than "round already applied": hash the actual patch content.
+    try:
+        from action_ledger import has_action, append_action  # type: ignore
+    except Exception:
+        has_action = None
+        append_action = None
+
+    if has_action is not None and has_action(run_dir, action_id=action_id, kind="patch_apply"):
+        payload = {
+            "ok": True,
+            "skipped": True,
+            "reason": "idempotent_skip_already_applied",
+            "round": round_n,
+            "agent": agent_id,
+            "output_path": str(out_path),
+            "action_id": action_id,
+        }
+        (state_dir / f"patch_apply_round{round_n}.json").write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        return 0
+
     report: dict[str, Any] = {
         "ok": True,
         "round": round_n,
         "agent": agent_id,
         "output_path": str(out_path),
+        "action_id": action_id,
         "diff_blocks": len(diff_blocks),
         "blocks": [],
         "dry_run": bool(args.dry_run),
@@ -274,9 +410,11 @@ def main() -> int:
     if decision is not None:
         report["decision_path"] = str(run_dir / "state" / "decisions" / f"round{round_n}_agent{agent_id}.json")
         report["decision_files"] = decision_files
+        report["decision_validation_ok"] = validation_ok
     else:
         report["decision_path"] = ""
         report["decision_files"] = []
+        report["decision_validation_ok"] = False
 
     if not blocks:
         report["ok"] = not bool(args.require_diff_blocks)
@@ -393,6 +531,16 @@ def main() -> int:
         report["blocks"].append(block_report)
 
     (state_dir / f"patch_apply_round{round_n}.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
+    if report.get("ok") and (append_action is not None) and (not bool(args.dry_run)):
+        try:
+            append_action(
+                run_dir,
+                action_id=action_id,
+                kind="patch_apply",
+                details={"round": round_n, "agent": agent_id, "output_path": str(out_path)},
+            )
+        except Exception:
+            pass
     return 0 if report.get("ok") else 8
 
 

@@ -40,6 +40,12 @@ TOOLS: List[Dict[str, Any]] = [
         "desc": "Writes state/manifest.json for machine-checkable budgets/plan.",
     },
     {
+        "id": "team_compiler",
+        "kind": "planning",
+        "path": "scripts/team_compiler.py",
+        "desc": "Compiles a 3..7 role team for the prompt (reduces swarm chaos).",
+    },
+    {
         "id": "agent_cards",
         "kind": "coordination",
         "path": "scripts/agent_cards.py",
@@ -80,6 +86,12 @@ TOOLS: List[Dict[str, Any]] = [
         "kind": "retrieval",
         "path": "scripts/retrieval_pack.py",
         "desc": "Bounded multi-retriever pack (code/docs/memory) injected into prompts.",
+    },
+    {
+        "id": "approve_action",
+        "kind": "safety",
+        "path": "scripts/approve_action.py",
+        "desc": "Appends an approval record (HITL) to state/approvals.jsonl for a specific action_id.",
     },
     {
         "id": "killswitch",

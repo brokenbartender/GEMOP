@@ -130,6 +130,8 @@ def main() -> int:
     ap.add_argument("--require-decision-json", action="store_true")
     ap.add_argument("--auto-apply-patches", action="store_true")
     ap.add_argument("--verify-after-patches", action="store_true")
+    ap.add_argument("--require-approval", action="store_true", help="Require HITL approval before sensitive actions (ex: patch apply).")
+    ap.add_argument("--require-grounding", action="store_true", help="Require grounding citations before applying patches.")
     ap.add_argument("--contract-repair-attempts", type=int, default=1)
     args = ap.parse_args()
 
@@ -162,6 +164,8 @@ def main() -> int:
             "require_decision_json": bool(args.require_decision_json),
             "require_diff_blocks_on_autopatch": bool(args.auto_apply_patches),
             "verify_after_patches": bool(args.verify_after_patches),
+            "require_approval": bool(args.require_approval),
+            "require_grounding": bool(args.require_grounding),
         },
         "rounds": _round_plan(str(args.pattern), int(args.max_rounds)),
         "service_router": _default_service_router(online=bool(args.online)),

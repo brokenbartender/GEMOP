@@ -77,6 +77,13 @@ param(
   # If enabled, apply unified-diff blocks from the best agent output in implementation rounds.
   [switch]$AutoApplyPatches,
   [switch]$AutoApplyMcpCapabilities,
+  # New: human-in-the-loop gate for sensitive actions (ex: applying patches).
+  [switch]$RequireApproval,
+  # New: require grounding citations before applying patches (reduces hallucinated edits).
+  [switch]$RequireGrounding,
+  # New: compile a 3..7 role team based on the prompt (reduces agent chaos).
+  [switch]$AutoTeam,
+  [int]$MaxTeamSize = 7,
 
   # New: optional web research ingestion (safe URL fetch only) before Round 1.
   [string]$ResearchUrls = "",
@@ -1452,6 +1459,27 @@ $skipAgentIds = Parse-AgentIdList $SkipAgents
 $adversaryIds = Parse-AgentIdList $Adversaries
 $supervisorOn = $EnableSupervisor -or $EnableCouncilBus
 
+# Optional: compile a tighter role team (3..7) to reduce swarm overhead and improve quality.
+if ($AutoTeam -and -not [string]::IsNullOrWhiteSpace($Prompt)) {
+  try {
+    $tc = Join-Path $RepoRoot "scripts\\team_compiler.py"
+    if (Test-Path -LiteralPath $tc) {
+      $jsonText = & python $tc --prompt $Prompt --max-agents $MaxTeamSize
+      if ($LASTEXITCODE -eq 0 -and $jsonText) {
+        $obj = $jsonText | ConvertFrom-Json
+        if ($obj -and $obj.roles) {
+          $Team = (@($obj.roles) -join ",")
+          $Agents = 0
+          Write-OrchLog -RunDir $RunDir -Msg ("auto_team roles={0}" -f $Team)
+          try { Append-LifecycleEvent -RunDir $RunDir -Event "auto_team" -RoundNumber 0 -AgentId 0 -Details @{ roles = $Team } } catch { }
+        }
+      }
+    }
+  } catch {
+    try { Write-OrchLog -RunDir $RunDir -Msg ("auto_team_failed error={0}" -f $_.Exception.Message) } catch { }
+  }
+}
+
 function Invoke-Blackout([string]$RunDir, [int]$AgentCount, [int]$DisconnectPct, [int]$WipePct, [int]$Seed) {
   if ($AgentCount -le 0) { return @{ disconnect=@(); wipe=@() } }
   $d = [Math]::Max(0, [Math]::Min(100, $DisconnectPct))
@@ -1532,6 +1560,8 @@ if ($existingRunnerScripts -and $existingRunnerScripts.Count -gt 0) {
       if ($RequireDecisionJson) { $margs += "--require-decision-json" }
       if ($AutoApplyPatches) { $margs += "--auto-apply-patches" }
       if ($VerifyAfterPatches) { $margs += "--verify-after-patches" }
+      if ($RequireApproval) { $margs += "--require-approval" }
+      if ($RequireGrounding) { $margs += "--require-grounding" }
       $margs += @("--contract-repair-attempts","$ContractRepairAttempts")
       & python @margs | Out-Null
       Write-OrchLog -RunDir $RunDir -Msg "manifest_written"
@@ -1584,6 +1614,8 @@ if ($existingRunnerScripts -and $existingRunnerScripts.Count -gt 0) {
       if ($RequireDecisionJson) { $margs += "--require-decision-json" }
       if ($AutoApplyPatches) { $margs += "--auto-apply-patches" }
       if ($VerifyAfterPatches) { $margs += "--verify-after-patches" }
+      if ($RequireApproval) { $margs += "--require-approval" }
+      if ($RequireGrounding) { $margs += "--require-grounding" }
       $margs += @("--contract-repair-attempts","$ContractRepairAttempts")
       & python @margs | Out-Null
       Write-OrchLog -RunDir $RunDir -Msg "manifest_written"
@@ -1839,8 +1871,8 @@ if ($existingRunnerScripts -and $existingRunnerScripts.Count -gt 0) {
       } catch { }
     }
 
-    # Optional: auto-apply diffs produced by the highest-integrity agent in implementation rounds.
-    if ($AutoApplyPatches -and $r -ge 2) {
+  # Optional: auto-apply diffs produced by the highest-integrity agent in implementation rounds.
+  if ($AutoApplyPatches -and $r -ge 2) {
       try {
         # Ensure decisions exist for the chosen agent so patch-apply can enforce declared touched files.
         try {
@@ -1852,8 +1884,11 @@ if ($existingRunnerScripts -and $existingRunnerScripts.Count -gt 0) {
         } catch { }
 
         $cpa = Join-Path $RepoRoot "scripts\\council_patch_apply.py"
-        try { Append-LifecycleEvent -RunDir $RunDir -Event "auto_apply_patches_start" -RoundNumber $r -AgentId 0 -Details @{} } catch { }
-        Invoke-NativeStrict -Exe "python" -Args @($cpa,"--repo-root",$RepoRoot,"--run-dir",$RunDir,"--round",$r,"--require-decision-files","--require-diff-blocks","--verify") -Context ("council_patch_apply round={0}" -f $r) | Out-Null
+        $cpaArgs = @($cpa,"--repo-root",$RepoRoot,"--run-dir",$RunDir,"--round",$r,"--require-decision-files","--require-diff-blocks","--verify")
+        if ($RequireApproval) { $cpaArgs += "--require-approval" }
+        if ($RequireGrounding) { $cpaArgs += "--require-grounding" }
+        try { Append-LifecycleEvent -RunDir $RunDir -Event "auto_apply_patches_start" -RoundNumber $r -AgentId 0 -Details @{ require_approval = [bool]$RequireApproval; require_grounding = [bool]$RequireGrounding } } catch { }
+        Invoke-NativeStrict -Exe "python" -Args $cpaArgs -Context ("council_patch_apply round={0}" -f $r) | Out-Null
         Write-OrchLog -RunDir $RunDir -Msg ("auto_apply_patches round={0} ok" -f $r)
         try { Append-LifecycleEvent -RunDir $RunDir -Event "auto_apply_patches_done" -RoundNumber $r -AgentId 0 -Details @{} } catch { }
       } catch {
