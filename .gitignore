@@ -64,6 +64,11 @@ ramshare/state/council_prompt.txt
 agents/ramshare/
 final_success.png
 last_fail.html
+decision.json
+state/decision.json
+docs/token_usage_report.json
+ramshare/temp_trend_job.json
+scripts/vuln_db.json
 *.stdout.log
 *.stderr.log
 *.log

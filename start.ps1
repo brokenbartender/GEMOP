@@ -86,12 +86,22 @@ if ($Online) { $Model = "gpt-5.2-gemini" }
 
 if ($Brain) {
     Write-Host "[Mode] SOVEREIGN BRAIN (Canonical)" -ForegroundColor Cyan
-    & python (Join-Path $RepoRoot "scripts\\sovereign_brain.py")
+    $brainScript = (Join-Path $RepoRoot "scripts\\sovereign_brain.py")
+    if (-not (Test-Path -LiteralPath $brainScript)) {
+        Write-Error "[Mode] -Brain requested but missing scripts\\sovereign_brain.py. Use -Council or default mode, or add the optional Brain modules."
+        exit 1
+    }
+    & python $brainScript
     exit $LASTEXITCODE
 }
 
 if ($Mouth) {
     Write-Host "[Mode] MOUTH (Single Terminal)" -ForegroundColor Cyan
+    $mouthScript = (Join-Path $RepoRoot "scripts\\mouth.py")
+    if (-not (Test-Path -LiteralPath $mouthScript)) {
+        Write-Error "[Mode] -Mouth requested but missing scripts\\mouth.py. Use -Council or default mode, or add the optional Mouth modules."
+        exit 1
+    }
     # Default to free/local chat for the mouth. Use -Online to allow cloud hybrid routing.
     if ($Online) {
         $env:GEMINI_OP_LLM_MODE = 'hybrid'
@@ -101,7 +111,7 @@ if ($Mouth) {
     # Fast chat + stronger planning (both free/local unless LLM_MODE enables cloud).
     if (-not $env:GEMINI_OP_OLLAMA_MODEL_CHAT) { $env:GEMINI_OP_OLLAMA_MODEL_CHAT = 'phi3:mini' }
     if (-not $env:GEMINI_OP_OLLAMA_MODEL_PLAN) { $env:GEMINI_OP_OLLAMA_MODEL_PLAN = 'phi4' }
-    & python (Join-Path $RepoRoot "scripts\\mouth.py")
+    & python $mouthScript
     exit $LASTEXITCODE
 }
 
