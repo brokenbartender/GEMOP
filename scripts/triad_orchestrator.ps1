@@ -85,6 +85,8 @@ param(
   # New: extract structured decisions from agent outputs and optionally require them.
   [switch]$ExtractDecisions,
   [switch]$RequireDecisionJson,
+  # New: best-effort self-heal when contract artifacts are missing (ex: DECISION_JSON).
+  [int]$ContractRepairAttempts = 1,
 
   # New: run verification pipeline after implementation rounds.
   [switch]$VerifyAfterPatches,
@@ -352,7 +354,17 @@ function Get-StopFiles([string]$RepoRoot, [string]$RunDir) {
 }
 
 function Test-StopRequested([string]$RepoRoot, [string]$RunDir) {
-  foreach ($p in (Get-StopFiles -RepoRoot $RepoRoot -RunDir $RunDir)) {
+  # In mock mode (tests/simulations), ignore global stop flags so a user's prior STOP doesn't break CI/local tests.
+  $mock = (($env:GEMINI_OP_MOCK_MODE) -and (($env:GEMINI_OP_MOCK_MODE).ToString().Trim().ToLower() -in @("1","true","yes")))
+  $ignoreGlobal = (($env:GEMINI_OP_IGNORE_GLOBAL_STOP) -and (($env:GEMINI_OP_IGNORE_GLOBAL_STOP).ToString().Trim().ToLower() -in @("1","true","yes")))
+
+  $paths = Get-StopFiles -RepoRoot $RepoRoot -RunDir $RunDir
+  if ($mock -or $ignoreGlobal) {
+    # Only run-scoped stop file.
+    $paths = @((Join-Path $RunDir "state\\STOP"))
+  }
+
+  foreach ($p in $paths) {
     try { if (Test-Path -LiteralPath $p) { return $true } } catch { }
   }
   return $false
@@ -754,8 +766,25 @@ function Generate-RunScaffold {
 
   $teamList = @()
   if ($Agents -gt 0) {
+    # Better defaults than Agent01..AgentNN: seed meaningful roles for higher-quality outputs,
+    # then fall back to AgentXX if the requested count exceeds the role list.
+    $defaultRoles = @(
+      "Architect",
+      "ResearchLead",
+      "Engineer",
+      "Tester",
+      "Critic",
+      "Security",
+      "Ops",
+      "Docs",
+      "Release"
+    )
     for ($i = 1; $i -le $Agents; $i++) {
-      $teamList += ("Agent{0:D2}" -f $i)
+      if ($i -le $defaultRoles.Count) {
+        $teamList += $defaultRoles[$i - 1]
+      } else {
+        $teamList += ("Agent{0:D2}" -f $i)
+      }
     }
   } else {
     foreach ($t in ($TeamCsv -split ",")) {
@@ -1332,6 +1361,8 @@ try {
   }
 } catch { }
 
+
+
 if (-not [string]::IsNullOrWhiteSpace($TenantId)) {
   $tenantPath = Join-Path $RunDir "state\\tenant.json"
   @{ tenant_id = $TenantId; created_at = (Get-Date -Format o) } | ConvertTo-Json | Set-Content -LiteralPath $tenantPath -Encoding UTF8
@@ -1414,6 +1445,32 @@ if ($existingRunnerScripts -and $existingRunnerScripts.Count -gt 0) {
   } else {
     $env:GEMINI_OP_CLOUD_AGENT_IDS = ""
   }
+
+  # Machine-checkable run manifest (plan + budgets). Best-effort.
+  try {
+    $mr = Join-Path $RepoRoot "scripts\\manifest_router.py"
+    if (Test-Path -LiteralPath $mr) {
+      $margs = @(
+        $mr,
+        "--repo-root",$RepoRoot,
+        "--run-dir",$RunDir,
+        "--task",$Prompt,
+        "--pattern",$CouncilPattern,
+        "--agents","$agentCount",
+        "--max-rounds","$MaxRounds"
+      )
+      if ($Online) { $margs += "--online" }
+      $margs += @("--cloud-seats","$CloudSeats","--max-local-concurrency","$MaxLocalConcurrency")
+      if ($QuotaCloudCalls -gt 0) { $margs += @("--quota-cloud-calls","$QuotaCloudCalls") }
+      if ($QuotaCloudCallsPerAgent -gt 0) { $margs += @("--quota-cloud-calls-per-agent","$QuotaCloudCallsPerAgent") }
+      if ($RequireDecisionJson) { $margs += "--require-decision-json" }
+      if ($AutoApplyPatches) { $margs += "--auto-apply-patches" }
+      if ($VerifyAfterPatches) { $margs += "--verify-after-patches" }
+      $margs += @("--contract-repair-attempts","$ContractRepairAttempts")
+      & python @margs | Out-Null
+      Write-OrchLog -RunDir $RunDir -Msg "manifest_written"
+    }
+  } catch { }
 } else {
   $teamList = @()
   if ($Agents -gt 0) {
@@ -1440,6 +1497,32 @@ if ($existingRunnerScripts -and $existingRunnerScripts.Count -gt 0) {
   } else {
     $env:GEMINI_OP_CLOUD_AGENT_IDS = ""
   }
+
+  # Machine-checkable run manifest (plan + budgets). Best-effort.
+  try {
+    $mr = Join-Path $RepoRoot "scripts\\manifest_router.py"
+    if (Test-Path -LiteralPath $mr) {
+      $margs = @(
+        $mr,
+        "--repo-root",$RepoRoot,
+        "--run-dir",$RunDir,
+        "--task",$Prompt,
+        "--pattern",$CouncilPattern,
+        "--agents","$agentCount",
+        "--max-rounds","$MaxRounds"
+      )
+      if ($Online) { $margs += "--online" }
+      $margs += @("--cloud-seats","$CloudSeats","--max-local-concurrency","$MaxLocalConcurrency")
+      if ($QuotaCloudCalls -gt 0) { $margs += @("--quota-cloud-calls","$QuotaCloudCalls") }
+      if ($QuotaCloudCallsPerAgent -gt 0) { $margs += @("--quota-cloud-calls-per-agent","$QuotaCloudCallsPerAgent") }
+      if ($RequireDecisionJson) { $margs += "--require-decision-json" }
+      if ($AutoApplyPatches) { $margs += "--auto-apply-patches" }
+      if ($VerifyAfterPatches) { $margs += "--verify-after-patches" }
+      $margs += @("--contract-repair-attempts","$ContractRepairAttempts")
+      & python @margs | Out-Null
+      Write-OrchLog -RunDir $RunDir -Msg "manifest_written"
+    }
+  } catch { }
 
   if ($EnableCouncilBus) {
     $busState = Join-Path $RunDir "bus\\state.json"
@@ -1529,8 +1612,48 @@ if ($existingRunnerScripts -and $existingRunnerScripts.Count -gt 0) {
         if (Test-Path -LiteralPath $ed) {
           $ea = @("--run-dir",$RunDir,"--round",$r,"--agent-count",$agentCount)
           if ($RequireDecisionJson) { $ea += "--require" }
-          $edArgs = @($ed) + @($ea)
-          Invoke-NativeStrict -Exe "python" -Args $edArgs -Context ("extract_agent_decisions round={0}" -f $r) | Out-Null
+
+          $missing = @()
+          $jsonText = & python $ed @ea
+          $rc = $LASTEXITCODE
+          try {
+            $obj = $null
+            if ($jsonText) { $obj = $jsonText | ConvertFrom-Json }
+            if ($obj -and $obj.missing) { $missing = @($obj.missing) }
+          } catch { $missing = @() }
+
+          # Self-heal: if DECISION_JSON is required but missing, re-run only the failing seats with a repair prompt.
+          if ($RequireDecisionJson -and $rc -ne 0 -and $ContractRepairAttempts -gt 0 -and $missing.Count -gt 0) {
+            for ($attempt = 1; $attempt -le $ContractRepairAttempts; $attempt++) {
+              if (Test-StopRequested -RepoRoot $RepoRoot -RunDir $RunDir) { break }
+              if (-not $missing -or $missing.Count -eq 0) { break }
+              try {
+                $ids = (@($missing) -join ",")
+                Write-OrchLog -RunDir $RunDir -Msg ("contract_repair_start round={0} attempt={1} agents={2}" -f $r, $attempt, $ids)
+                $cr = Join-Path $RepoRoot "scripts\\contract_repair.py"
+                if (Test-Path -LiteralPath $cr) {
+                  & python $cr --repo-root $RepoRoot --run-dir $RunDir --round $r --agents $ids --attempt $attempt --mode decision_json --timeout-s $AgentTimeoutSec | Out-Null
+                  Write-OrchLog -RunDir $RunDir -Msg ("contract_repair_done round={0} attempt={1}" -f $r, $attempt)
+                }
+              } catch {
+                Write-OrchLog -RunDir $RunDir -Msg ("contract_repair_failed round={0} attempt={1} error={2}" -f $r, $attempt, $_.Exception.Message)
+              }
+
+              # Re-extract (strict).
+              $jsonText = & python $ed @ea
+              $rc = $LASTEXITCODE
+              try {
+                $obj = $null
+                if ($jsonText) { $obj = $jsonText | ConvertFrom-Json }
+                if ($obj -and $obj.missing) { $missing = @($obj.missing) } else { $missing = @() }
+              } catch { $missing = @() }
+              if ($rc -eq 0) { break }
+            }
+          }
+
+          if ($RequireDecisionJson -and $rc -ne 0) {
+            throw ("extract_agent_decisions failed round={0} missing={1}" -f $r, (@($missing) -join ","))
+          }
           Write-OrchLog -RunDir $RunDir -Msg ("decisions_extracted round={0}" -f $r)
         }
       } catch {

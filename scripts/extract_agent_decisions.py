@@ -63,6 +63,15 @@ def normalize(obj: dict[str, Any], *, agent: int, round_n: int) -> dict[str, Any
     return out
 
 
+def _latest_repair_output(run_dir: Path, *, round_n: int, agent: int) -> Path | None:
+    repairs = run_dir / "state" / "repairs"
+    if not repairs.exists():
+        return None
+    # Files are named round{r}_agent{i}_repair{attempt}.md
+    cand = sorted(repairs.glob(f"round{int(round_n)}_agent{int(agent)}_repair*.md"))
+    return cand[-1] if cand else None
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="Extract structured DECISION_JSON blocks from agent outputs.")
     ap.add_argument("--run-dir", required=True)
@@ -91,10 +100,19 @@ def main() -> int:
             md_path = run_dir / f"agent{i}.md"
         md = read_text(md_path)
         obj = extract_decision(md)
+        src = md_path
+        if not obj:
+            rp = _latest_repair_output(run_dir, round_n=round_n, agent=i)
+            if rp is not None and rp.exists():
+                md2 = read_text(rp)
+                obj = extract_decision(md2)
+                if obj:
+                    src = rp
         if not obj:
             missing.append(i)
             continue
         norm = normalize(obj, agent=i, round_n=round_n)
+        norm["source_path"] = str(src)
         (out_dir / f"round{round_n}_agent{i}.json").write_text(json.dumps(norm, indent=2), encoding="utf-8")
         extracted += 1
 
@@ -113,4 +131,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

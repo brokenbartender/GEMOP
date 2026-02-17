@@ -32,6 +32,9 @@ param(
   [int]$CloudSeats = 3,
   [int]$MaxLocalConcurrency = 2,
 
+  # Self-heal: re-run only failing seats to repair missing DECISION_JSON before stopping.
+  [int]$ContractRepairAttempts = 1,
+
   # Skill bridge tuning
   [int]$MaxSkills = 14,
   [int]$SkillCharBudget = 45000,
@@ -96,6 +99,7 @@ $args = @(
   "-AgentTimeoutSec", "$AgentTimeoutSec",
   "-CloudSeats", "$CloudSeats",
   "-MaxLocalConcurrency", "$MaxLocalConcurrency",
+  "-ContractRepairAttempts", "$ContractRepairAttempts",
   "-AutoSelectSkills",
   "-MaxSkills", "$MaxSkills",
   "-SkillCharBudget", "$SkillCharBudget"
