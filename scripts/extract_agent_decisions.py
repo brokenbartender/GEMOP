@@ -63,6 +63,72 @@ def normalize(obj: dict[str, Any], *, agent: int, round_n: int) -> dict[str, Any
     return out
 
 
+def _is_suspicious_path(p: str) -> bool:
+    s = (p or "").strip()
+    if not s:
+        return True
+    # Disallow absolute paths and drive letters (grounding).
+    if s.startswith(("/", "\\")):
+        return True
+    if re.match(r"^[a-zA-Z]:[\\/]", s):
+        return True
+    # Disallow parent traversal.
+    if ".." in s.replace("\\", "/").split("/"):
+        return True
+    return False
+
+
+def validate_decision(obj: dict[str, Any], *, round_n: int) -> list[str]:
+    """
+    "Atomic agent" reliability:
+    - Strict-ish JSON contract so orchestration can be deterministic.
+    - Treat invalid contract as missing (so contract_repair can fix it).
+    """
+    errs: list[str] = []
+
+    if not isinstance(obj, dict):
+        return ["decision_not_object"]
+
+    summary = obj.get("summary") if "summary" in obj else obj.get("plan")
+    if summary is None or (isinstance(summary, str) and not summary.strip()):
+        errs.append("missing_summary")
+    elif not isinstance(summary, str):
+        errs.append("summary_not_string")
+
+    for k in ("files", "commands", "risks"):
+        v = obj.get(k, [])
+        if v is None:
+            v = []
+        if not isinstance(v, list):
+            errs.append(f"{k}_not_array")
+            continue
+        for i, item in enumerate(v):
+            if not isinstance(item, str) or not item.strip():
+                errs.append(f"{k}[{i}]_not_string")
+                continue
+            if k == "files" and _is_suspicious_path(item):
+                errs.append(f"files[{i}]_invalid_path")
+
+    conf = obj.get("confidence", 0.0)
+    if conf is None:
+        conf = 0.0
+    try:
+        c = float(conf)
+        if c < 0.0 or c > 1.0:
+            errs.append("confidence_out_of_range")
+    except Exception:
+        errs.append("confidence_not_number")
+
+    # Round-aware expectations (lightweight):
+    # - later rounds should be more actionable.
+    if int(round_n) >= 2:
+        cmds = obj.get("commands") or []
+        if not isinstance(cmds, list) or len([x for x in cmds if isinstance(x, str) and x.strip()]) == 0:
+            errs.append("missing_commands_round2plus")
+
+    return errs
+
+
 def _latest_repair_output(run_dir: Path, *, round_n: int, agent: int) -> Path | None:
     repairs = run_dir / "state" / "repairs"
     if not repairs.exists():
@@ -93,6 +159,8 @@ def main() -> int:
     agent_count = max(1, agent_count)
 
     missing: list[int] = []
+    invalid: list[int] = []
+    invalid_reasons: dict[str, list[str]] = {}
     extracted = 0
     for i in range(1, agent_count + 1):
         md_path = run_dir / f"round{round_n}_agent{i}.md"
@@ -111,17 +179,25 @@ def main() -> int:
         if not obj:
             missing.append(i)
             continue
+        errs = validate_decision(obj, round_n=round_n)
+        if errs:
+            invalid.append(i)
+            invalid_reasons[str(i)] = errs
         norm = normalize(obj, agent=i, round_n=round_n)
         norm["source_path"] = str(src)
+        norm["validation_ok"] = not bool(errs)
+        norm["validation_errors"] = errs
         (out_dir / f"round{round_n}_agent{i}.json").write_text(json.dumps(norm, indent=2), encoding="utf-8")
         extracted += 1
 
     report = {
-        "ok": (not missing) or (not args.require),
+        "ok": (not missing and not invalid) or (not args.require),
         "round": round_n,
         "agent_count": agent_count,
         "extracted": extracted,
         "missing": missing,
+        "invalid": invalid,
+        "invalid_reasons": invalid_reasons,
         "generated_at": time.time(),
     }
     (state_dir / f"decisions_round{round_n}.json").write_text(json.dumps(report, indent=2), encoding="utf-8")

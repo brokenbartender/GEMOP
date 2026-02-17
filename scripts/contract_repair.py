@@ -74,7 +74,7 @@ def _build_repair_prompt(
         "- Return EXACTLY ONE fenced JSON block labeled DECISION_JSON.\n"
         "- No prose outside the JSON fence.\n"
         "- The JSON must include keys: summary (string), files (array), commands (array), risks (array), confidence (0..1).\n"
-        "- files must be repo-relative paths only.\n"
+        "- files must be repo-relative paths only (no absolute paths, no drive letters, no .. traversal).\n"
         "- commands must be runnable commands to verify your suggested work.\n\n"
         "[PRIOR_OUTPUT_TAIL]\n"
         + (prior_tail.strip() or "(empty)") +
@@ -208,4 +208,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

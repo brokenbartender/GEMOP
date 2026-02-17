@@ -386,6 +386,23 @@ function Append-Escalation([string]$RunDir, [string]$Kind, [string]$Reason, [has
   } catch { }
 }
 
+function Append-LifecycleEvent([string]$RunDir, [string]$Event, [int]$RoundNumber, [int]$AgentId, [hashtable]$Details) {
+  try {
+    $stateDir = Join-Path $RunDir "state"
+    Ensure-Dir $stateDir
+    $p = Join-Path $stateDir "lifecycle.jsonl"
+    $row = @{
+      ts = (Get-Date -Format o)
+      event = $Event
+    }
+    if ($RoundNumber -gt 0) { $row["round"] = [int]$RoundNumber }
+    if ($AgentId -gt 0) { $row["agent"] = [int]$AgentId }
+    if ($Details) { $row["details"] = $Details }
+    $line = ($row | ConvertTo-Json -Depth 12 -Compress)
+    Add-Content -LiteralPath $p -Value $line -Encoding UTF8
+  } catch { }
+}
+
 function Write-StopRequested([string]$RepoRoot, [string]$RunDir, [string]$Reason) {
   $r = ""
   try { if ($null -ne $Reason) { $r = [string]$Reason } } catch { $r = "" }
@@ -399,6 +416,7 @@ function Write-StopRequested([string]$RepoRoot, [string]$RunDir, [string]$Reason
 
   # Escalation trace: stop is a human-in-the-loop interrupt, so record it explicitly.
   Append-Escalation -RunDir $RunDir -Kind "stop_requested" -Reason $r -Details @{ repo_root = $RepoRoot; run_dir = $RunDir }
+  Append-LifecycleEvent -RunDir $RunDir -Event "stop_requested" -RoundNumber 0 -AgentId 0 -Details @{ reason = $r }
 }
 
 function Start-KillSwitchTimer([string]$RepoRoot, [string]$RunDir, [int]$AfterSec) {
@@ -1305,8 +1323,10 @@ function Invoke-NativeStrict {
     [Parameter(Mandatory=$false)][object[]]$Args = @(),
     [Parameter(Mandatory=$false)][string]$Context = ""
   )
+  try { Append-LifecycleEvent -RunDir $RunDir -Event "native_exec_start" -RoundNumber 0 -AgentId 0 -Details @{ exe = $Exe; context = $Context } } catch { }
   $out = & $Exe @Args
   $rc = $LASTEXITCODE
+  try { Append-LifecycleEvent -RunDir $RunDir -Event "native_exec_end" -RoundNumber 0 -AgentId 0 -Details @{ exe = $Exe; context = $Context; rc = [int]$rc } } catch { }
   if ($rc -ne 0) {
     $ctx = if ([string]::IsNullOrWhiteSpace($Context)) { "" } else { " context=$Context" }
     throw ("Native command failed rc={0}{1} exe={2}" -f $rc, $ctx, $Exe)
@@ -1378,15 +1398,19 @@ if ($EnableCouncilBus) { Ensure-Dir (Join-Path $RunDir "bus") }
 Ensure-MissionAnchor -RunDir $RunDir -Prompt $Prompt
 
 # Best-effort: write tool registry + initial context artifacts before Round 1 prompts are generated.
-try {
+  try {
   $tr = Join-Path $RepoRoot "scripts\\tool_registry.py"
   if (Test-Path -LiteralPath $tr) {
+    try { Append-LifecycleEvent -RunDir $RunDir -Event "tool_registry_start" -RoundNumber 0 -AgentId 0 -Details @{} } catch { }
     & python $tr --repo-root $RepoRoot --run-dir $RunDir | Out-Null
+    try { Append-LifecycleEvent -RunDir $RunDir -Event "tool_registry_done" -RoundNumber 0 -AgentId 0 -Details @{} } catch { }
   }
 } catch { }
-try {
-  & python (Join-Path $RepoRoot "scripts\\state_rebuilder.py") --run-dir $RunDir --round 1 | Out-Null
-} catch { }
+  try {
+    try { Append-LifecycleEvent -RunDir $RunDir -Event "state_rebuilder_start" -RoundNumber 1 -AgentId 0 -Details @{} } catch { }
+    & python (Join-Path $RepoRoot "scripts\\state_rebuilder.py") --run-dir $RunDir --round 1 | Out-Null
+    try { Append-LifecycleEvent -RunDir $RunDir -Event "state_rebuilder_done" -RoundNumber 1 -AgentId 0 -Details @{} } catch { }
+  } catch { }
 
 # Initialize run ledger (resumable state for dashboards/tools).
 try {
@@ -1618,11 +1642,14 @@ if ($existingRunnerScripts -and $existingRunnerScripts.Count -gt 0) {
     try {
       $rp = Join-Path $RepoRoot "scripts\\retrieval_pack.py"
       if (Test-Path -LiteralPath $rp) {
+        try { Append-LifecycleEvent -RunDir $RunDir -Event "retrieval_pack_start" -RoundNumber $r -AgentId 0 -Details @{} } catch { }
         & python $rp --repo-root $RepoRoot --run-dir $RunDir --round $r --query $Prompt --max-per-section 20 | Out-Null
         Write-OrchLog -RunDir $RunDir -Msg ("retrieval_pack_written round={0}" -f $r)
+        try { Append-LifecycleEvent -RunDir $RunDir -Event "retrieval_pack_done" -RoundNumber $r -AgentId 0 -Details @{} } catch { }
       }
     } catch {
       try { Write-OrchLog -RunDir $RunDir -Msg ("retrieval_pack_failed round={0} error={1}" -f $r, $_.Exception.Message) } catch { }
+      try { Append-LifecycleEvent -RunDir $RunDir -Event "retrieval_pack_failed" -RoundNumber $r -AgentId 0 -Details @{ error = $_.Exception.Message } } catch { }
     }
 
     Generate-RunScaffold -RepoRoot $RepoRoot -RunDir $RunDir -Prompt $Prompt -TeamCsv $Team -Agents $Agents -CouncilPattern $CouncilPattern -InjectLearningHints:$InjectLearningHints -InjectCapabilityContract:$InjectCapabilityContract -AdversaryIds $adversaryIds -AdversaryMode $AdversaryMode -PoisonPath $PoisonPath -PoisonAgent $PoisonAgent -Ontology $Ontology -OntologyOverrideAgent $OntologyOverrideAgent -OntologyOverride $OntologyOverride -MisinformAgent $MisinformAgent -MisinformText $MisinformText -RoundNumber $r
@@ -1632,11 +1659,14 @@ if ($existingRunnerScripts -and $existingRunnerScripts.Count -gt 0) {
     try {
       $ac = Join-Path $RepoRoot "scripts\\agent_cards.py"
       if (Test-Path -LiteralPath $ac) {
+        try { Append-LifecycleEvent -RunDir $RunDir -Event "agent_cards_start" -RoundNumber $r -AgentId 0 -Details @{} } catch { }
         & python $ac --repo-root $RepoRoot --run-dir $RunDir --round $r | Out-Null
         Write-OrchLog -RunDir $RunDir -Msg ("agent_cards_written round={0}" -f $r)
+        try { Append-LifecycleEvent -RunDir $RunDir -Event "agent_cards_done" -RoundNumber $r -AgentId 0 -Details @{} } catch { }
       }
     } catch {
       try { Write-OrchLog -RunDir $RunDir -Msg ("agent_cards_failed round={0} error={1}" -f $r, $_.Exception.Message) } catch { }
+      try { Append-LifecycleEvent -RunDir $RunDir -Event "agent_cards_failed" -RoundNumber $r -AgentId 0 -Details @{ error = $_.Exception.Message } } catch { }
     }
 
     try { Update-RunLedgerRoundEvent -RunDir $RunDir -RoundNumber $r -Event "start" } catch { }
@@ -1646,7 +1676,10 @@ if ($existingRunnerScripts -and $existingRunnerScripts.Count -gt 0) {
     if ($effMax -ne $MaxParallel) {
       Write-OrchLog -RunDir $RunDir -Msg ("scheduler_backpressure requested_max_parallel={0} effective_max_parallel={1} cloud_seats={2} max_local_concurrency={3}" -f $MaxParallel, $effMax, $CloudSeats, $MaxLocalConcurrency)
     }
+    try { Append-LifecycleEvent -RunDir $RunDir -Event "round_start" -RoundNumber $r -AgentId 0 -Details @{ effective_max_parallel = [int]$effMax } } catch { }
+    try { Append-LifecycleEvent -RunDir $RunDir -Event "agents_invoke_start" -RoundNumber $r -AgentId 0 -Details @{ effective_max_parallel = [int]$effMax } } catch { }
     Invoke-RunAgents -RunDir $RunDir -MaxParallel $effMax -SkipAgentIds $skipAgentIds -AgentTimeoutSec $AgentTimeoutSec -RoundNumber $r -Resume:$Resume
+    try { Append-LifecycleEvent -RunDir $RunDir -Event "agents_invoke_done" -RoundNumber $r -AgentId 0 -Details @{} } catch { }
     if (-not (Test-StopRequested -RepoRoot $RepoRoot -RunDir $RunDir)) {
       Ensure-AgentRoundOutputs -RunDir $RunDir -RoundNumber $r -AgentCount $agentCount -SkipAgentIds $skipAgentIds -AgentTimeoutSec $AgentTimeoutSec
     } else {
@@ -1668,6 +1701,7 @@ if ($existingRunnerScripts -and $existingRunnerScripts.Count -gt 0) {
     } catch { }
     Write-Log "round $r complete"
     Write-OrchLog -RunDir $RunDir -Msg "round_complete round=$r"
+    try { Append-LifecycleEvent -RunDir $RunDir -Event "round_complete" -RoundNumber $r -AgentId 0 -Details @{} } catch { }
     try { Update-RunLedgerRoundEvent -RunDir $RunDir -RoundNumber $r -Event "complete" } catch { }
 
     if ($ExtractDecisions -or $RequireDecisionJson) {
@@ -1678,13 +1712,22 @@ if ($existingRunnerScripts -and $existingRunnerScripts.Count -gt 0) {
           if ($RequireDecisionJson) { $ea += "--require" }
 
           $missing = @()
+          $invalid = @()
           $jsonText = & python $ed @ea
           $rc = $LASTEXITCODE
           try {
             $obj = $null
             if ($jsonText) { $obj = $jsonText | ConvertFrom-Json }
             if ($obj -and $obj.missing) { $missing = @($obj.missing) }
-          } catch { $missing = @() }
+            if ($obj -and $obj.invalid) { $invalid = @($obj.invalid) }
+          } catch { $missing = @(); $invalid = @() }
+
+          if ($invalid -and $invalid.Count -gt 0) {
+            try { Write-OrchLog -RunDir $RunDir -Msg ("decisions_invalid round={0} agents={1}" -f $r, (@($invalid) -join ",")) } catch { }
+            try { Append-LifecycleEvent -RunDir $RunDir -Event "decisions_invalid" -RoundNumber $r -AgentId 0 -Details @{ invalid = @($invalid) } } catch { }
+            # Treat invalid contract as missing to trigger repair/stop in strict mode.
+            $missing = @($missing + $invalid | Sort-Object -Unique)
+          }
 
           # Self-heal: if DECISION_JSON is required but missing, re-run only the failing seats with a repair prompt.
           if ($RequireDecisionJson -and $rc -ne 0 -and $ContractRepairAttempts -gt 0 -and $missing.Count -gt 0) {
@@ -1694,13 +1737,16 @@ if ($existingRunnerScripts -and $existingRunnerScripts.Count -gt 0) {
               try {
                 $ids = (@($missing) -join ",")
                 Write-OrchLog -RunDir $RunDir -Msg ("contract_repair_start round={0} attempt={1} agents={2}" -f $r, $attempt, $ids)
+                try { Append-LifecycleEvent -RunDir $RunDir -Event "contract_repair_start" -RoundNumber $r -AgentId 0 -Details @{ attempt = [int]$attempt; agents = $ids } } catch { }
                 $cr = Join-Path $RepoRoot "scripts\\contract_repair.py"
                 if (Test-Path -LiteralPath $cr) {
                   & python $cr --repo-root $RepoRoot --run-dir $RunDir --round $r --agents $ids --attempt $attempt --mode decision_json --timeout-s $AgentTimeoutSec | Out-Null
                   Write-OrchLog -RunDir $RunDir -Msg ("contract_repair_done round={0} attempt={1}" -f $r, $attempt)
+                  try { Append-LifecycleEvent -RunDir $RunDir -Event "contract_repair_done" -RoundNumber $r -AgentId 0 -Details @{ attempt = [int]$attempt } } catch { }
                 }
               } catch {
                 Write-OrchLog -RunDir $RunDir -Msg ("contract_repair_failed round={0} attempt={1} error={2}" -f $r, $attempt, $_.Exception.Message)
+                try { Append-LifecycleEvent -RunDir $RunDir -Event "contract_repair_failed" -RoundNumber $r -AgentId 0 -Details @{ attempt = [int]$attempt; error = $_.Exception.Message } } catch { }
               }
 
               # Re-extract (strict).
@@ -1710,6 +1756,8 @@ if ($existingRunnerScripts -and $existingRunnerScripts.Count -gt 0) {
                 $obj = $null
                 if ($jsonText) { $obj = $jsonText | ConvertFrom-Json }
                 if ($obj -and $obj.missing) { $missing = @($obj.missing) } else { $missing = @() }
+                if ($obj -and $obj.invalid) { $invalid = @($obj.invalid) } else { $invalid = @() }
+                if ($invalid -and $invalid.Count -gt 0) { $missing = @($missing + $invalid | Sort-Object -Unique) }
               } catch { $missing = @() }
               if ($rc -eq 0) { break }
             }
@@ -1719,9 +1767,11 @@ if ($existingRunnerScripts -and $existingRunnerScripts.Count -gt 0) {
             throw ("extract_agent_decisions failed round={0} missing={1}" -f $r, (@($missing) -join ","))
           }
           Write-OrchLog -RunDir $RunDir -Msg ("decisions_extracted round={0}" -f $r)
+          try { Append-LifecycleEvent -RunDir $RunDir -Event "decisions_extracted" -RoundNumber $r -AgentId 0 -Details @{ missing = @($missing); invalid = @($invalid) } } catch { }
         }
       } catch {
         Write-OrchLog -RunDir $RunDir -Msg ("decisions_extract_failed round={0} error={1}" -f $r, $_.Exception.Message)
+        try { Append-LifecycleEvent -RunDir $RunDir -Event "decisions_extract_failed" -RoundNumber $r -AgentId 0 -Details @{ error = $_.Exception.Message } } catch { }
         if ($RequireDecisionJson) {
           Write-StopRequested -RepoRoot $RepoRoot -RunDir $RunDir -Reason ("missing_decisions round={0}" -f $r)
         }
@@ -1802,10 +1852,13 @@ if ($existingRunnerScripts -and $existingRunnerScripts.Count -gt 0) {
         } catch { }
 
         $cpa = Join-Path $RepoRoot "scripts\\council_patch_apply.py"
+        try { Append-LifecycleEvent -RunDir $RunDir -Event "auto_apply_patches_start" -RoundNumber $r -AgentId 0 -Details @{} } catch { }
         Invoke-NativeStrict -Exe "python" -Args @($cpa,"--repo-root",$RepoRoot,"--run-dir",$RunDir,"--round",$r,"--require-decision-files","--require-diff-blocks","--verify") -Context ("council_patch_apply round={0}" -f $r) | Out-Null
         Write-OrchLog -RunDir $RunDir -Msg ("auto_apply_patches round={0} ok" -f $r)
+        try { Append-LifecycleEvent -RunDir $RunDir -Event "auto_apply_patches_done" -RoundNumber $r -AgentId 0 -Details @{} } catch { }
       } catch {
         Write-OrchLog -RunDir $RunDir -Msg ("auto_apply_patches_failed round={0} error={1}" -f $r, $_.Exception.Message)
+        try { Append-LifecycleEvent -RunDir $RunDir -Event "auto_apply_patches_failed" -RoundNumber $r -AgentId 0 -Details @{ error = $_.Exception.Message } } catch { }
         Write-StopRequested -RepoRoot $RepoRoot -RunDir $RunDir -Reason ("auto_apply_patches_failed round={0}" -f $r)
       }
     }
@@ -1814,11 +1867,14 @@ if ($existingRunnerScripts -and $existingRunnerScripts.Count -gt 0) {
       try {
         $vp = Join-Path $RepoRoot "scripts\\verify_pipeline.py"
         if (Test-Path -LiteralPath $vp) {
+          try { Append-LifecycleEvent -RunDir $RunDir -Event "verify_pipeline_start" -RoundNumber $r -AgentId 0 -Details @{} } catch { }
           Invoke-NativeStrict -Exe "python" -Args @($vp,"--repo-root",$RepoRoot,"--run-dir",$RunDir,"--strict") -Context ("verify_pipeline round={0}" -f $r) | Out-Null
           Write-OrchLog -RunDir $RunDir -Msg ("verify_pipeline round={0} ok" -f $r)
+          try { Append-LifecycleEvent -RunDir $RunDir -Event "verify_pipeline_done" -RoundNumber $r -AgentId 0 -Details @{} } catch { }
         }
       } catch {
         Write-OrchLog -RunDir $RunDir -Msg ("verify_pipeline_failed round={0} error={1}" -f $r, $_.Exception.Message)
+        try { Append-LifecycleEvent -RunDir $RunDir -Event "verify_pipeline_failed" -RoundNumber $r -AgentId 0 -Details @{ error = $_.Exception.Message } } catch { }
         Write-StopRequested -RepoRoot $RepoRoot -RunDir $RunDir -Reason ("verify_failed round={0}" -f $r)
       }
     }
