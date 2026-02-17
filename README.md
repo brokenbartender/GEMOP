@@ -19,11 +19,20 @@ Gemini OP is an agentic workspace runner with a hardened PowerShell orchestrator
 pwsh .\scripts\triad_orchestrator.ps1 -RepoRoot (Resolve-Path .) -RunDir .\.agent-jobs\<your-run> -EnableCouncilBus
 ```
 
+## One-line "Summon a Council" (Recommended)
+
+Create a new run directory, auto-select skills from both `~/.codex/skills` and `~/.gemini/skills`, and run a multi-agent council:
+
+```powershell
+pwsh .\scripts\summon.ps1 -Task "Fix the failing tests and add coverage for the new feature" -Online
+```
+
 ## Key scripts
 
 - `scripts\triad_orchestrator.ps1` — primary orchestrator (this is the supported entrypoint).
 - `scripts\agent_batch_orchestrator.ps1` — deprecated wrapper kept for backward compatibility.
 - `scripts\safe-auto-run.ps1` / `scripts\safe-auto-rollback.ps1` — guarded automation runner and rollback.
+- `scripts\summon.ps1` — command-center entrypoint: creates a run dir and summons a council with auto-selected skills.
 
 ## Logging
 

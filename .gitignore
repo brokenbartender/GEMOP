@@ -38,6 +38,8 @@ config.toml
 config.local.toml
 gemini.log
 .DS_Store
+# Skill catalog cache (local runtime)
+state/skill_catalog_cache.json
 
 # Local debug run artifacts (kept out of git)
 tmp_run_*/

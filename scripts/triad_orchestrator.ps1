@@ -93,7 +93,13 @@ param(
   [switch]$AdaptiveConcurrency,
 
   # New: resumable runs (skip agents whose round outputs already exist and are COMPLETE).
-  [switch]$Resume
+  [switch]$Resume,
+
+  # New: external skills bridge (Codex/Gemini skills) -> auto-selected skill pack injected into prompts.
+  # Defaults on when not explicitly set (for "summon agents to do X" UX).
+  [switch]$AutoSelectSkills,
+  [int]$MaxSkills = 14,
+  [int]$SkillCharBudget = 45000
 )
 
 Set-StrictMode -Version Latest
@@ -619,6 +625,93 @@ $task
   Set-Content -LiteralPath $p -Value $body -Encoding UTF8
 }
 
+function Ensure-SkillPack {
+  param(
+    [string]$RepoRoot,
+    [string]$RunDir,
+    [string]$Prompt,
+    [int]$MaxSkills = 14,
+    [int]$SkillCharBudget = 45000,
+    [string]$IncludeSkillsCsv = ""
+  )
+
+  try {
+    $stateDir = Join-Path $RunDir "state"
+    Ensure-Dir $stateDir
+    $outMd = Join-Path $stateDir "skills_selected.md"
+
+    if (Test-Path -LiteralPath $outMd) {
+      try {
+        $len = (Get-Item -LiteralPath $outMd).Length
+        if ($len -ge 200) { return }
+      } catch { return }
+    }
+
+    if ([string]::IsNullOrWhiteSpace($Prompt)) { return }
+
+    $bridge = Join-Path $RepoRoot "scripts\\skill_bridge.py"
+    if (-not (Test-Path -LiteralPath $bridge)) { return }
+
+    $outJson = Join-Path $stateDir "skills_selected.json"
+    $args = @(
+      $bridge, "select",
+      "--task", $Prompt,
+      "--max-skills", "$MaxSkills",
+      "--max-chars", "$SkillCharBudget",
+      "--out-md", $outMd,
+      "--out-json", $outJson
+    )
+
+    if (-not [string]::IsNullOrWhiteSpace($IncludeSkillsCsv)) {
+      $args += @("--include", $IncludeSkillsCsv)
+    }
+
+    & python @args | Out-Null
+    try { Write-OrchLog -RunDir $RunDir -Msg ("skills_selected out={0}" -f $outMd) } catch { }
+  } catch {
+    try { Write-OrchLog -RunDir $RunDir -Msg ("skills_select_failed error={0}" -f $_.Exception.Message) } catch { }
+  }
+}
+
+function Get-RequestedSkillsCsv {
+  param(
+    [string]$RunDir,
+    [int]$PrevRoundNumber
+  )
+
+  $skills = @()
+  try {
+    if ($PrevRoundNumber -le 0) { return "" }
+    $files = @(Get-ChildItem -LiteralPath $RunDir -Filter ("round{0}_agent*.md" -f $PrevRoundNumber) -File -ErrorAction SilentlyContinue)
+    foreach ($f in $files) {
+      try {
+        $txt = Read-Text $f.FullName
+        if (-not $txt) { continue }
+
+        # Format:
+        # ```json SKILL_REQUEST_JSON
+        # {"skills":["a","b"],"reason":"..."}
+        # ```
+        # Use single-quoted literal to avoid PowerShell backtick escaping inside the ``` fence.
+        $m = [regex]::Match($txt, '```json\s+SKILL_REQUEST_JSON\s*(\{.*?\})\s*```', [System.Text.RegularExpressions.RegexOptions]::Singleline)
+        if (-not $m.Success) { continue }
+        $raw = $m.Groups[1].Value
+        if (-not $raw) { continue }
+        $obj = $raw | ConvertFrom-Json
+        foreach ($s in @($obj.skills)) {
+          $name = ""
+          try { $name = [string]$s } catch { $name = "" }
+          if ($name) { $skills += $name.Trim() }
+        }
+      } catch { }
+    }
+  } catch { }
+
+  try { $skills = @($skills | Where-Object { $_ } | Sort-Object -Unique) } catch { }
+  if (-not $skills -or $skills.Count -eq 0) { return "" }
+  return ($skills -join ",")
+}
+
 function Generate-RunScaffold {
   param(
     [string]$RepoRoot,
@@ -691,6 +784,13 @@ function Generate-RunScaffold {
     if ($sources) {
       if ($sources.Length -gt 4000) { $sources = $sources.Substring(0, 4000) }
       $sources = "[RESEARCH SOURCES - FETCHED]`r`n$sources`r`n`r`n"
+    }
+
+    $skills = Read-Text (Join-Path $RunDir "state\\skills_selected.md")
+    if ($skills) {
+      # Keep the injected pack bounded; the selector budgets, but be defensive.
+      if ($skills.Length -gt 60000) { $skills = $skills.Substring(0, 60000) }
+      $skills = "[SKILLS - AUTO-SELECTED PLAYBOOKS]`r`n$skills`r`n`r`n"
     }
 
     $cap = ""
@@ -789,10 +889,10 @@ $pt
     }
 
     $body = @"
-$world$sources$anchor$lessons$header
-$cap$supervisorMemo$ownerBlock$onto$misinfo$adv$poison
-[OPERATIONAL CONTEXT]
-REPO_ROOT: $RepoRoot
+ $world$sources$skills$anchor$lessons$header
+ $cap$supervisorMemo$ownerBlock$onto$misinfo$adv$poison
+ [OPERATIONAL CONTEXT]
+ REPO_ROOT: $RepoRoot
 RUN_DIR: $RunDir
 COUNCIL_PATTERN: $CouncilPattern
 ROUND: $RoundNumber
@@ -803,14 +903,18 @@ You are Agent $i. Role: $role
 [TASK]
 $roundTask
 
-[OUTPUT CONTRACT]
-- Cite exact repo file paths.
-- Include at least one verification command.
-- Include a `DECISION_JSON` block:
-  ```json DECISION_JSON
-  {"summary":"...","files":["..."],"commands":["..."],"risks":["..."],"confidence":0.0}
-  ```
-- If an ontology is present, include a first-line `ONTOLOGY_ACK: urgent_definition=<...>` and flag mismatches you detect.
+ [OUTPUT CONTRACT]
+ - Cite exact repo file paths.
+ - Include at least one verification command.
+ - If you need additional procedural playbooks from the local skill libraries, request them for the next round by adding:
+   ```json SKILL_REQUEST_JSON
+   {"skills":["playwright","security-best-practices"],"reason":"why you need them"}
+   ```
+ - Include a `DECISION_JSON` block:
+   ```json DECISION_JSON
+   {"summary":"...","files":["..."],"commands":["..."],"risks":["..."],"confidence":0.0}
+   ```
+ - If an ontology is present, include a first-line `ONTOLOGY_ACK: urgent_definition=<...>` and flag mismatches you detect.
 - End with COMPLETED.
 "@
 
@@ -1349,6 +1453,20 @@ if ($existingRunnerScripts -and $existingRunnerScripts.Count -gt 0) {
         $skipAgentIds = @($skipAgentIds | Sort-Object -Unique)
       } catch { }
     }
+
+    # Skill pack selection: default-on unless explicitly disabled.
+    # Additionally, agents may request more playbooks for the next round via SKILL_REQUEST_JSON.
+    if (-not $PSBoundParameters.ContainsKey('AutoSelectSkills') -or $AutoSelectSkills) {
+      $includeCsv = ""
+      if ($r -ge 2) {
+        $includeCsv = Get-RequestedSkillsCsv -RunDir $RunDir -PrevRoundNumber ($r - 1)
+        if ($includeCsv) {
+          try { Write-OrchLog -RunDir $RunDir -Msg ("skills_requested round={0} include={1}" -f $r, $includeCsv) } catch { }
+        }
+      }
+      Ensure-SkillPack -RepoRoot $RepoRoot -RunDir $RunDir -Prompt $Prompt -MaxSkills $MaxSkills -SkillCharBudget $SkillCharBudget -IncludeSkillsCsv $includeCsv
+    }
+
     Generate-RunScaffold -RepoRoot $RepoRoot -RunDir $RunDir -Prompt $Prompt -TeamCsv $Team -Agents $Agents -CouncilPattern $CouncilPattern -InjectLearningHints:$InjectLearningHints -InjectCapabilityContract:$InjectCapabilityContract -AdversaryIds $adversaryIds -AdversaryMode $AdversaryMode -PoisonPath $PoisonPath -PoisonAgent $PoisonAgent -Ontology $Ontology -OntologyOverrideAgent $OntologyOverrideAgent -OntologyOverride $OntologyOverride -MisinformAgent $MisinformAgent -MisinformText $MisinformText -RoundNumber $r
     Ensure-RunnerScripts -RepoRoot $RepoRoot -RunDir $RunDir -RoundNumber $r -AgentCount $agentCount
 

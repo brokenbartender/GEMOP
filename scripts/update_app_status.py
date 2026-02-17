@@ -72,6 +72,8 @@ def render(root: Path) -> str:
     lines.append("## Skills")
     lines.append(f"- Local skills (`agents/skills/skill_*.py`): **{local}**")
     lines.append(f"- Global skills (skills registry): **{global_n}**")
+    lines.append("- External skills sources (bridged into council prompts): `C:\\Users\\<you>\\.codex\\skills`, `C:\\Users\\<you>\\.gemini\\skills` (override via `GEMINI_OP_SKILLS_DIR_CODEX` / `GEMINI_OP_SKILLS_DIR_GEMINI`).")
+    lines.append("- Skill selection + pack rendering: `scripts/skill_bridge.py` -> `<run_dir>/state/skills_selected.md` (auto-injected by `scripts/triad_orchestrator.ps1`).")
     lines.append("")
     lines.append("## UIs")
     lines.append("- Streamlit dashboard: `scripts/dashboard.py` (includes `GOVERNANCE`, `SKILLS`, and `DOCS` tabs)")

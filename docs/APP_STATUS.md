@@ -21,6 +21,8 @@ It is the single source of truth for the current runtime shape and counts.
 ## Skills
 - Local skills (`agents/skills/skill_*.py`): **0**
 - Global skills (skills registry): **1267**
+- External skills sources (bridged into council prompts): `C:\Users\<you>\.codex\skills`, `C:\Users\<you>\.gemini\skills` (override via `GEMINI_OP_SKILLS_DIR_CODEX` / `GEMINI_OP_SKILLS_DIR_GEMINI`).
+- Skill selection + pack rendering: `scripts/skill_bridge.py` -> `<run_dir>/state/skills_selected.md` (auto-injected by `scripts/triad_orchestrator.ps1`).
 
 ## UIs
 - Streamlit dashboard: `scripts/dashboard.py` (includes `GOVERNANCE`, `SKILLS`, and `DOCS` tabs)
