@@ -11,7 +11,9 @@ from typing import Any
 
 def read_json(path: Path) -> Any:
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
+        # Windows PowerShell's `Set-Content -Encoding UTF8` writes a UTF-8 BOM by default,
+        # which breaks naive json.loads() on some files (pids.json/run.json).
+        return json.loads(path.read_bytes().decode("utf-8-sig"))
     except Exception:
         return None
 

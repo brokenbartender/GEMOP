@@ -56,6 +56,16 @@ function Slug([string]$s) {
   return $t.ToLower()
 }
 
+# Stop other agents first (killswitch), then clear stop flags.
+# Important: do this before creating a new run dir, because stop_agents writes STOP into all known run dirs.
+try {
+  $StopScript = Join-Path $RepoRoot "scripts\\stop_agents.ps1"
+  if (Test-Path -LiteralPath $StopScript) {
+    & powershell -NoProfile -ExecutionPolicy Bypass -File $StopScript | Out-Null
+    & powershell -NoProfile -ExecutionPolicy Bypass -File $StopScript -ClearStopFlags | Out-Null
+  }
+} catch { }
+
 if ([string]::IsNullOrWhiteSpace($RunDir)) {
   $jobs = Join-Path $RepoRoot ".agent-jobs"
   Ensure-Dir $jobs
@@ -64,15 +74,6 @@ if ([string]::IsNullOrWhiteSpace($RunDir)) {
 }
 Ensure-Dir $RunDir
 Ensure-Dir (Join-Path $RunDir "state")
-
-# Stop other agents first (killswitch), then clear stop flags.
-try {
-  $StopScript = Join-Path $RepoRoot "scripts\\stop_agents.ps1"
-  if (Test-Path -LiteralPath $StopScript) {
-    & powershell -NoProfile -ExecutionPolicy Bypass -File $StopScript | Out-Null
-    & powershell -NoProfile -ExecutionPolicy Bypass -File $StopScript -ClearStopFlags | Out-Null
-  }
-} catch { }
 
 $ExecPath = Join-Path $RepoRoot "scripts\\triad_orchestrator.ps1"
 if (-not (Test-Path -LiteralPath $ExecPath)) {
@@ -95,7 +96,6 @@ $args = @(
   "-AgentTimeoutSec", "$AgentTimeoutSec",
   "-CloudSeats", "$CloudSeats",
   "-MaxLocalConcurrency", "$MaxLocalConcurrency",
-  "-AdaptiveConcurrency:$($AdaptiveConcurrency.IsPresent)",
   "-AutoSelectSkills",
   "-MaxSkills", "$MaxSkills",
   "-SkillCharBudget", "$SkillCharBudget"
@@ -104,9 +104,9 @@ $args = @(
 if ($Online) { $args += "-Online" }
 if ($AutoApplyPatches) { $args += "-AutoApplyPatches" }
 if ($VerifyAfterPatches) { $args += "-VerifyAfterPatches" }
+if ($AdaptiveConcurrency) { $args += "-AdaptiveConcurrency" }
 
 Write-Host "[Summon] RunDir: $RunDir" -ForegroundColor Gray
 Write-Host "[Summon] Task: $Task" -ForegroundColor Cyan
 & powershell -NoProfile -ExecutionPolicy Bypass -File $ExecPath @args
 exit $LASTEXITCODE
-
