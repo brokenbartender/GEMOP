@@ -1,0 +1,14 @@
+# Local-only overrides (this file is safe to commit as an example).
+# Copy selected sections into configs/config.local.toml (ignored by git).
+
+# Example: trust this repo checkout
+# [projects.'C:\\path\\to\\gemini-op-clean']
+# trust_level = "trusted"
+
+# Example: trust system locations (if you intentionally allow it)
+# [projects.'C:\\Windows\\System32']
+# trust_level = "trusted"
+
+# Example: override model
+# model = "ollama/phi4"
+

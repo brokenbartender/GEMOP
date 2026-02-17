@@ -1,0 +1,18 @@
+# Safe baseline config for Gemini CLI
+ask_for_approval = "on-request"
+sandbox = "workspace-write"
+model = "gpt-5.2-Gemini"
+personality = "pragmatic"
+
+[features]
+powershell_utf8 = true
+unified_exec = true
+shell_snapshot = true
+
+# Per-machine trust rules belong in configs/config.local.toml (ignored).
+# Example:
+# [projects.'C:\\path\\to\\repo']
+# trust_level = "trusted"
+
+[notice]
+hide_full_access_warning = false

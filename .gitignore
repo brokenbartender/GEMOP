@@ -30,6 +30,10 @@ ramshare/strategy/*.json
 !ramshare/strategy/README.md
 ramshare/resources/pdf/*.pdf
 ramshare/resources/web/*.html
+ramshare/chroma_db/
+ramshare/neural_bus.db
+ramshare/state/mouth_chat.jsonl
+ramshare/state/project_focus.txt
 config.toml
 config.local.toml
 gemini.log
@@ -52,3 +56,19 @@ ramshare/notes/distilled/learning_tasks/
 ramshare/state/governance/fairness_ledger.jsonl
 
 gcloud_service_key.json
+
+# Local council/evidence artifacts
+STOP_ALL_AGENTS.flag
+ramshare/state/STOP
+ramshare/state/council_prompt.txt
+agents/ramshare/
+final_success.png
+last_fail.html
+*.stdout.log
+*.stderr.log
+*.log
+
+# Keep the shared config profiles versioned, but do not commit local secrets.
+configs/config.local.toml
+configs/secrets.json
+configs/config.active.toml

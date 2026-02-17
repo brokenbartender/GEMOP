@@ -1,0 +1,23 @@
+ask_for_approval = "never"
+sandbox = "workspace-write"
+model = "gpt-5.2-Gemini"
+model_reasoning_effort = "medium"
+personality = "pragmatic"
+suppress_unstable_features_warning = true
+
+[features]
+experimental_windows_sandbox = true
+elevated_windows_sandbox = true
+powershell_utf8 = true
+collab = true
+steer = true
+unified_exec = true
+apps = true
+shell_snapshot = true
+
+# Per-machine trust rules belong in configs/config.local.toml (ignored).
+
+[notice]
+hide_full_access_warning = true
+
+

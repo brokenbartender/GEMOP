@@ -1,15 +1,43 @@
 param(
   [string]$Profile = 'full',
+  [ValidateSet('base','core','full','max')]
+  [string]$ConfigProfile = '',
   [switch]$Online,
-  [switch]$Triad, # New: Activates 3-agent autonomous mode
+  [Alias('Triad')]
+  [switch]$Council, # Multi-agent council mode (canonical name). Alias: -Triad (legacy)
+  [switch]$Brain, # Canonical: Sovereign Brain + Executive Core
+  [switch]$Mouth, # Single interactive terminal -> NeuralBus -> Executive Core (recommended day-to-day)
+  [switch]$AutoApplyPatches, # Council mode: auto-apply ```diff blocks (fail-closed) after implementation rounds.
+  [switch]$StopOthers, # Stop prior agent processes before starting a new council run.
+  [string]$Team = "Architect,Engineer,Tester", # Council mode: CSV team roles (used when -Agents=0).
+  [int]$Agents = 0, # Council mode: explicit agent count (overrides -Team roles list).
+  [int]$MaxRounds = 2, # Council mode: debate rounds (debate uses R1 design, R2+ implement).
+  [int]$MaxParallel = 3, # Council mode: max concurrent agent processes spawned.
+  [int]$AgentTimeoutSec = 900, # Council mode: max wall time per agent process (prevents hangs).
+  [int]$QuotaCloudCalls = 0, # Council mode: global cloud call budget (optional).
+  [int]$QuotaCloudCallsPerAgent = 0, # Council mode: per-agent cloud call budget (optional).
+  [int]$CloudSeats = 3, # Council mode: only first N agents may use cloud when -Online.
+  [int]$MaxLocalConcurrency = 2, # Council mode: cap concurrent local Ollama calls (quota-cliff safety).
   [switch]$SaveTokens,
   [switch]$Dashboard,
+  [switch]$SkipDocCheck,
   [string]$Prompt
 )
 
 $ErrorActionPreference = 'Stop'
 $RepoRoot = $PSScriptRoot
 Set-Location $RepoRoot
+
+# 0. Docs guardrail (refresh + validate)
+try {
+    $docScript = (Join-Path $RepoRoot 'scripts\\check_docs.ps1')
+    $docArgs = @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $docScript, "-Fix")
+    if ($SkipDocCheck) { $docArgs += "-Skip" }
+    & powershell @docArgs | Out-Null
+} catch {
+    Write-Error ("[Docs] Failed: {0}. Re-run with -SkipDocCheck to bypass." -f $_.Exception.Message)
+    exit 1
+}
 
 # 0. Start Dashboard
 if ($Dashboard) {
@@ -23,13 +51,28 @@ if ($Dashboard) {
 
 # 1. Environment Setup
 $env:GEMINI_OP_REPO_ROOT = $RepoRoot
-$env:GEMINI_CONFIG = Join-Path $RepoRoot "config.local.toml"
 $log = Join-Path $RepoRoot "gemini.log"
 
 if ($SaveTokens) { $env:GEMINI_SAVE_TOKENS = 'true' }
 
 Write-Host "== GEMINI OP: MARKET READY V1.0 ==" -ForegroundColor Cyan
 Write-Host "Repo: $RepoRoot" -ForegroundColor Gray
+
+# 1b. Assemble active config (portable: base + profile + local overlay)
+$resolvedProfile = $ConfigProfile
+if (-not $resolvedProfile) { $resolvedProfile = $Profile }
+if (-not (Test-Path (Join-Path $RepoRoot ("configs\\config.$resolvedProfile.toml")))) {
+    $resolvedProfile = 'full'
+}
+$activeConfig = Join-Path $RepoRoot 'configs\\config.active.toml'
+try {
+    & python (Join-Path $RepoRoot 'scripts\\config_assemble.py') --repo-root $RepoRoot --config-profile $resolvedProfile --out $activeConfig *>> $log
+    $env:GEMINI_CONFIG = $activeConfig
+    Write-Host "Config: $resolvedProfile -> $activeConfig" -ForegroundColor Gray
+} catch {
+    Write-Warning "Config assemble failed: $($_.Exception.Message). Falling back to configs\\config.local.toml"
+    $env:GEMINI_CONFIG = Join-Path $RepoRoot "configs\\config.local.toml"
+}
 
 # 2. Start Daemons
 if (Test-Path ".\start-daemons.ps1") {
@@ -41,28 +84,82 @@ if (Test-Path ".\start-daemons.ps1") {
 $Model = "ollama/phi4"
 if ($Online) { $Model = "gpt-5.2-gemini" }
 
-if ($Triad) {
-    Write-Host "[Mode] TRIAD COUNCIL (Multi-Agent)" -ForegroundColor Cyan
-    $ExecPath = Join-Path $RepoRoot "scripts\gemini_orchestrator.ps1"
-} else {
-    Write-Host "[Mode] SINGLE AGENT" -ForegroundColor Green
+if ($Brain) {
+    Write-Host "[Mode] SOVEREIGN BRAIN (Canonical)" -ForegroundColor Cyan
+    & python (Join-Path $RepoRoot "scripts\\sovereign_brain.py")
+    exit $LASTEXITCODE
 }
 
-# 4. Autonomous Loop
-Write-Host "[Loop] Starting Autonomous Agent..." -ForegroundColor Cyan
+if ($Mouth) {
+    Write-Host "[Mode] MOUTH (Single Terminal)" -ForegroundColor Cyan
+    # Default to free/local chat for the mouth. Use -Online to allow cloud hybrid routing.
+    if ($Online) {
+        $env:GEMINI_OP_LLM_MODE = 'hybrid'
+    } else {
+        $env:GEMINI_OP_LLM_MODE = 'local'
+    }
+    # Fast chat + stronger planning (both free/local unless LLM_MODE enables cloud).
+    if (-not $env:GEMINI_OP_OLLAMA_MODEL_CHAT) { $env:GEMINI_OP_OLLAMA_MODEL_CHAT = 'phi3:mini' }
+    if (-not $env:GEMINI_OP_OLLAMA_MODEL_PLAN) { $env:GEMINI_OP_OLLAMA_MODEL_PLAN = 'phi4' }
+    & python (Join-Path $RepoRoot "scripts\\mouth.py")
+    exit $LASTEXITCODE
+}
+
+if ($Council) {
+    Write-Host "[Mode] COUNCIL ORCHESTRATOR (Multi-Agent)" -ForegroundColor Cyan
+    $ExecPath = Join-Path $RepoRoot "scripts\\triad_orchestrator.ps1"
+    if (-not (Test-Path -LiteralPath $ExecPath)) {
+        throw "Missing orchestrator: $ExecPath"
+    }
+
+    # Default behavior: stop any prior runs before spawning a new council.
+    if (-not $PSBoundParameters.ContainsKey('StopOthers') -or $StopOthers) {
+        try {
+            $StopScript = Join-Path $RepoRoot "scripts\\stop_agents.ps1"
+            if (Test-Path -LiteralPath $StopScript) {
+                Write-Host "[Init] Stopping prior agents (killswitch)..." -ForegroundColor Yellow
+                & powershell -NoProfile -ExecutionPolicy Bypass -File $StopScript | Out-Null
+                # Clear repo-level STOP flags so the new run can proceed.
+                & powershell -NoProfile -ExecutionPolicy Bypass -File $StopScript -ClearStopFlags | Out-Null
+            }
+        } catch { }
+    }
+
+    $args = @(
+        "-RepoRoot", $RepoRoot,
+        "-CouncilPattern", "debate",
+        "-Team", "$Team",
+        "-Agents", "$Agents",
+        "-MaxRounds", "$MaxRounds",
+        "-EnableCouncilBus",
+        "-InjectLearningHints",
+        "-FailClosedOnThreshold",
+        "-Threshold", "70",
+        "-MaxParallel", "$MaxParallel",
+        "-AgentTimeoutSec", "$AgentTimeoutSec",
+        "-AgentsPerConsole", "2",
+        "-CloudSeats", "$CloudSeats",
+        "-MaxLocalConcurrency", "$MaxLocalConcurrency"
+    )
+    if ($Online) { $args += "-Online" }
+    if ($AutoApplyPatches) { $args += "-AutoApplyPatches" }
+    if ($QuotaCloudCalls -gt 0) { $args += @("-QuotaCloudCalls", "$QuotaCloudCalls") }
+    if ($QuotaCloudCallsPerAgent -gt 0) { $args += @("-QuotaCloudCallsPerAgent", "$QuotaCloudCallsPerAgent") }
+    if ($Prompt) { $args += @("-Prompt", $Prompt) }
+
+    & powershell -NoProfile -ExecutionPolicy Bypass -File $ExecPath @args
+    exit $LASTEXITCODE
+}
+
+Write-Host "[Mode] SINGLE AGENT (Gemini CLI)" -ForegroundColor Green
+Write-Host "[Loop] Starting Gemini CLI..." -ForegroundColor Cyan
 while ($true) {
     try {
-        if ($Triad) {
-            # Triad Orchestrator handles its own model routing based on config
-            & $ExecPath -RepoRoot $RepoRoot -CouncilPattern debate -EnableCouncilBus -Prompt $Prompt
-            $Prompt = $null # Clear after first run
-        } else {
-                    if ($Prompt) {
+        if ($Prompt) {
             & gemini --yolo --model $Model -p $Prompt
             $Prompt = $null # Clear after first run
         } else {
             & gemini --yolo --model $Model
-        }
         }
     } catch {
         Write-Error "Gemini crashed: $_"

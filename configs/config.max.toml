@@ -15,7 +15,8 @@ url = "https://developers.openai.com/mcp"
 [mcp_servers.filesystem]
 startup_timeout_sec = 60
 command = "npx"
-args = ["-y", "@modelcontextprotocol/server-filesystem", 'C:\Users\codym\.Gemini']
+# Use repo root (start.ps1 sets CWD to the repo).
+args = ["-y", "@modelcontextprotocol/server-filesystem", "."]
 
 [mcp_servers.chrome-devtools]
 startup_timeout_sec = 60

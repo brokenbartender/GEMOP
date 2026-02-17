@@ -335,6 +335,98 @@ def cmd_status(args: argparse.Namespace) -> None:
     )
 
 
+def cmd_sweep(args: argparse.Namespace) -> None:
+    """
+    Autonomous maintenance:
+    - Resolve stale proposals to prevent deadlocks.
+    - Optionally auto-ack stale open messages to keep the bus from growing unbounded.
+    """
+    run_dir = Path(args.run_dir).resolve()
+    st = load_state(run_dir)
+    rows = load_messages(messages_path(run_dir))
+    idx = status_index(rows)
+    now = now_ts()
+    max_age = max(1, int(args.max_age_sec))
+
+    changed = False
+    resolved: List[Dict[str, Any]] = []
+
+    decisions = st.get("decisions", {}) or {}
+    for pid, dec in list(decisions.items()):
+        try:
+            status = str(dec.get("status", ""))
+            created_at = float(dec.get("created_at", 0))
+        except Exception:
+            status = ""
+            created_at = 0.0
+        if status.startswith("resolved_"):
+            continue
+        if created_at and (now - created_at) < max_age:
+            continue
+        # Fail closed: reject unresolved proposals.
+        dec["status"] = "resolved_rejected"
+        dec["resolved_at"] = now
+        dec["resolution_reason"] = "deadlock_timeout"
+        decisions[pid] = dec
+        changed = True
+        resolved.append({"proposal_id": pid, "status": dec["status"]})
+        append_jsonl(
+            messages_path(run_dir),
+            {
+                "id": str(uuid.uuid4()),
+                "ts": now_ts(),
+                "from": "bus_sweeper",
+                "to": "council",
+                "intent": "deadlock_break",
+                "status": "open",
+                "ttl_sec": 3600,
+                "expires_at": now_ts() + 3600,
+                "payload": {"proposal_id": pid, "status": dec["status"], "reason": "deadlock_timeout"},
+                "trace_id": str(uuid.uuid4()),
+            },
+        )
+
+    if changed:
+        st["decisions"] = decisions
+        save_state(run_dir, st)
+
+    # Optional bus hygiene: auto-ack stale open messages that were never claimed/acked.
+    acked = 0
+    if args.ack_stale:
+        for r in rows:
+            try:
+                intent = str(r.get("intent", "")).lower()
+                mid = str(r.get("id") or "")
+                ts = float(r.get("ts", 0))
+            except Exception:
+                continue
+            if not mid or intent in {"ack", "claim"}:
+                continue
+            current_status = idx.get(mid, str(r.get("status", "open")))
+            if current_status != "open":
+                continue
+            if ts and (now - ts) < max_age:
+                continue
+            append_jsonl(
+                messages_path(run_dir),
+                {
+                    "id": str(uuid.uuid4()),
+                    "ts": now_ts(),
+                    "from": "bus_sweeper",
+                    "to": "council",
+                    "intent": "ack",
+                    "status": "acked",
+                    "ttl_sec": 3600,
+                    "expires_at": now_ts() + 3600,
+                    "payload": {"message_id": mid, "reason": "stale_timeout"},
+                    "trace_id": str(uuid.uuid4()),
+                },
+            )
+            acked += 1
+
+    print(json.dumps({"ok": True, "resolved_proposals": resolved, "auto_acked": acked}, indent=2))
+
+
 def build_parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(description="Council inter-agent communication bus with quorum decisions")
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -401,6 +493,12 @@ def build_parser() -> argparse.ArgumentParser:
     p_status = sub.add_parser("status")
     p_status.add_argument("--run-dir", required=True)
     p_status.set_defaults(func=cmd_status)
+
+    p_sweep = sub.add_parser("sweep")
+    p_sweep.add_argument("--run-dir", required=True)
+    p_sweep.add_argument("--max-age-sec", dest="max_age_sec", type=int, default=900)
+    p_sweep.add_argument("--ack-stale", action="store_true", help="Also auto-ack stale open messages.")
+    p_sweep.set_defaults(func=cmd_sweep)
     return ap
 
 
