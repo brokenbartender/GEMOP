@@ -809,6 +809,12 @@ function Generate-RunScaffold {
       $world = "[WORLD STATE - LAST SNAPSHOT]`r`n$world`r`n`r`n"
     }
 
+    $facts = Read-Text (Join-Path $RunDir "state\\fact_sheet.md")
+    if ($facts) {
+      if ($facts.Length -gt 6000) { $facts = $facts.Substring(0, 6000) }
+      $facts = "[UNIVERSAL FACT SHEET]`r`n$facts`r`n`r`n"
+    }
+
     $sources = Read-Text (Join-Path $RunDir "state\\sources.md")
     if ($sources) {
       if ($sources.Length -gt 4000) { $sources = $sources.Substring(0, 4000) }
@@ -918,7 +924,7 @@ $pt
     }
 
     $body = @"
- $world$sources$skills$anchor$lessons$header
+ $facts$world$sources$skills$anchor$lessons$header
  $cap$supervisorMemo$ownerBlock$onto$misinfo$adv$poison
  [OPERATIONAL CONTEXT]
  REPO_ROOT: $RepoRoot
@@ -1345,6 +1351,17 @@ Ensure-Dir (Join-Path $RunDir "state")
 if ($EnableCouncilBus) { Ensure-Dir (Join-Path $RunDir "bus") }
 
 Ensure-MissionAnchor -RunDir $RunDir -Prompt $Prompt
+
+# Best-effort: write tool registry + initial context artifacts before Round 1 prompts are generated.
+try {
+  $tr = Join-Path $RepoRoot "scripts\\tool_registry.py"
+  if (Test-Path -LiteralPath $tr) {
+    & python $tr --repo-root $RepoRoot --run-dir $RunDir | Out-Null
+  }
+} catch { }
+try {
+  & python (Join-Path $RepoRoot "scripts\\state_rebuilder.py") --run-dir $RunDir --round 1 | Out-Null
+} catch { }
 
 # Initialize run ledger (resumable state for dashboards/tools).
 try {
