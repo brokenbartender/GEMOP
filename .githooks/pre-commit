@@ -8,6 +8,6 @@ python scripts/update_app_status.py --check
 
 # 2) Fail closed on obvious secrets and risky code unless explicitly overridden.
 python scripts/scan_risk.py --staged >/dev/null
+python scripts/scan_secrets.py --staged >/dev/null
 
 exit 0
-

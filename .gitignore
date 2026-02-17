@@ -49,6 +49,7 @@ work/
 state/evidence/
 state/jobs/
 state/queue/
+state/verify_report.json
 
 # Local learning outputs (generated)
 ramshare/state/learning/

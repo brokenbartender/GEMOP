@@ -18,6 +18,8 @@ param(
   [int]$QuotaCloudCallsPerAgent = 0, # Council mode: per-agent cloud call budget (optional).
   [int]$CloudSeats = 3, # Council mode: only first N agents may use cloud when -Online.
   [int]$MaxLocalConcurrency = 2, # Council mode: cap concurrent local Ollama calls (quota-cliff safety).
+  [switch]$FailClosedOnThreshold, # Council mode: exit non-zero if the run scores below -Threshold.
+  [int]$Threshold = 70, # Council mode: quality threshold when -FailClosedOnThreshold is set.
   [switch]$Resume, # Council mode: skip agents already completed for the round.
   [switch]$ExtractDecisions, # Council mode: extract DECISION_JSON blocks into run state.
   [switch]$RequireDecisionJson, # Council mode: stop run if DECISION_JSON is missing.
@@ -34,6 +36,18 @@ param(
 $ErrorActionPreference = 'Stop'
 $RepoRoot = $PSScriptRoot
 Set-Location $RepoRoot
+
+# 0. Bootstrap git hooks (repo-local) so guardrails work on fresh clones.
+try {
+    if (Test-Path -LiteralPath (Join-Path $RepoRoot ".git")) {
+        if (Test-Path -LiteralPath (Join-Path $RepoRoot ".githooks")) {
+            & git config core.hooksPath .githooks | Out-Null
+        }
+        if (Test-Path -LiteralPath (Join-Path $RepoRoot ".gitmessage.txt")) {
+            & git config commit.template .gitmessage.txt | Out-Null
+        }
+    }
+} catch { }
 
 # 0. Docs guardrail (refresh + validate)
 try {
@@ -150,14 +164,13 @@ if ($Council) {
         "-MaxRounds", "$MaxRounds",
         "-EnableCouncilBus",
         "-InjectLearningHints",
-        "-FailClosedOnThreshold",
-        "-Threshold", "70",
         "-MaxParallel", "$MaxParallel",
         "-AgentTimeoutSec", "$AgentTimeoutSec",
         "-AgentsPerConsole", "2",
         "-CloudSeats", "$CloudSeats",
         "-MaxLocalConcurrency", "$MaxLocalConcurrency"
     )
+    if ($FailClosedOnThreshold) { $args += @("-FailClosedOnThreshold", "-Threshold", "$Threshold") }
     if ($Online) { $args += "-Online" }
     if ($AutoApplyPatches) { $args += "-AutoApplyPatches" }
     if ($Resume) { $args += "-Resume" }

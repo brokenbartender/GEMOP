@@ -55,6 +55,10 @@ def main() -> int:
     if (repo_root / ".git").exists():
         checks.append(run(["git", "diff", "--check"], cwd=repo_root))
 
+    # 3) Secret scan on current diff (useful after auto-apply).
+    if (repo_root / "scripts" / "scan_secrets.py").exists():
+        checks.append(run([sys.executable, "scripts/scan_secrets.py", "--diff"], cwd=repo_root))
+
     ok = all(int(c.get("rc") or 0) == 0 for c in checks)
     report = {
         "ok": bool(ok),
@@ -72,4 +76,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

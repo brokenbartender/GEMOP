@@ -50,6 +50,47 @@ if ($ClearStopFlags) {
 
 Write-StopFlags
 
+# Also write STOP into any known run dirs (best-effort) so per-run cooperative checks trip.
+try {
+  $jobsRoot = Join-Path $RepoRoot '.agent-jobs'
+  if (Test-Path -LiteralPath $jobsRoot) {
+    $jobDirs = Get-ChildItem -LiteralPath $jobsRoot -Directory -ErrorAction SilentlyContinue
+    foreach ($d in $jobDirs) {
+      try {
+        $runStop = Join-Path $d.FullName 'state\\STOP'
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $runStop) | Out-Null
+        Set-Content -LiteralPath $runStop -Value "STOP`r`n" -Encoding UTF8
+      } catch { }
+    }
+  }
+} catch { }
+
+# PID-targeted kill (preferred): kill known agent process trees recorded by orchestrator.
+function Try-TaskKillTree([int]$Pid) {
+  if ($Pid -le 0 -or $Pid -eq $PID) { return }
+  try { & taskkill.exe /PID $Pid /T /F 1>$null 2>$null } catch { }
+  try { Stop-Process -Id $Pid -Force -ErrorAction SilentlyContinue } catch { }
+}
+
+try {
+  $jobsRoot = Join-Path $RepoRoot '.agent-jobs'
+  if (Test-Path -LiteralPath $jobsRoot) {
+    $jobDirs = Get-ChildItem -LiteralPath $jobsRoot -Directory -ErrorAction SilentlyContinue
+    foreach ($d in $jobDirs) {
+      $pidsPath = Join-Path $d.FullName 'state\\pids.json'
+      if (-not (Test-Path -LiteralPath $pidsPath)) { continue }
+      try {
+        $raw = Get-Content -LiteralPath $pidsPath -Raw -ErrorAction SilentlyContinue
+        if (-not $raw) { continue }
+        $obj = $raw | ConvertFrom-Json
+        foreach ($e in @($obj.entries)) {
+          try { Try-TaskKillTree -Pid ([int]$e.pid) } catch { }
+        }
+      } catch { }
+    }
+  }
+} catch { }
+
 # Best-effort process termination (repo-scoped).
 $targets = @("python.exe","pythonw.exe","node.exe","pwsh.exe","powershell.exe","gemini.exe","streamlit.exe")
 $patterns = @(

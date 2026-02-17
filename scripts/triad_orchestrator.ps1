@@ -115,6 +115,44 @@ function Ensure-Dir([string]$Path) {
   }
 }
 
+function Try-TaskKillTree([int]$Pid) {
+  if ($Pid -le 0) { return }
+  try {
+    # /T: kill child processes, /F: force.
+    & taskkill.exe /PID $Pid /T /F 1>$null 2>$null
+  } catch { }
+}
+
+function Add-RunPidEntry([string]$RunDir, [int]$Pid, [int]$AgentId, [int]$RoundNumber, [string]$ScriptName, [string]$Kind) {
+  try {
+    $stateDir = Join-Path $RunDir "state"
+    Ensure-Dir $stateDir
+    $p = Join-Path $stateDir "pids.json"
+    $obj = Read-JsonOrNull -Path $p
+    if (-not $obj) {
+      $obj = [pscustomobject]@{
+        generated_at = (Get-Date -Format o)
+        entries = @()
+      }
+    }
+    $entries = @()
+    try { $entries = @($obj.entries) } catch { $entries = @() }
+    $entries = @($entries) + @([pscustomobject]@{
+      pid = $Pid
+      agent = $AgentId
+      round = $RoundNumber
+      script = $ScriptName
+      kind = $Kind
+      started_at = (Get-Date -Format o)
+    })
+    $out = [pscustomobject]@{
+      generated_at = (Get-Date -Format o)
+      entries = $entries
+    }
+    $out | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $p -Encoding UTF8
+  } catch { }
+}
+
 function Get-StopFiles([string]$RepoRoot, [string]$RunDir) {
   return @(
     (Join-Path $RepoRoot "STOP_ALL_AGENTS.flag"),
@@ -671,12 +709,14 @@ function Ensure-AgentRoundOutputs {
         $p = Start-Process -FilePath "powershell.exe" -ArgumentList @(
           "-NoProfile","-ExecutionPolicy","Bypass","-File", "`"$ps1`""
         ) -PassThru -WindowStyle Hidden
+        Add-RunPidEntry -RunDir $RunDir -Pid $p.Id -AgentId $i -RoundNumber $RoundNumber -ScriptName (Split-Path -Leaf $ps1) -Kind "retry_spawn"
 
         if ($retryTimeoutSec -gt 0) {
           Wait-Process -Id $p.Id -Timeout $retryTimeoutSec -ErrorAction SilentlyContinue | Out-Null
           $p.Refresh()
           if (-not $p.HasExited) {
             Write-OrchLog -RunDir $RunDir -Msg ("retry_timeout agent={0} round={1} pid={2} timeout_s={3}" -f $i, $RoundNumber, $p.Id, $retryTimeoutSec)
+            Try-TaskKillTree -Pid $p.Id
             try { Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue } catch { }
 
             # Clear slot locks for this agent so subsequent agents don't deadlock.
@@ -811,6 +851,7 @@ function Invoke-RunAgents {
     $p = Start-Process -FilePath "powershell.exe" -ArgumentList @(
       "-NoProfile","-ExecutionPolicy","Bypass","-File", "`"$($s.FullName)`""
     ) -PassThru -WindowStyle Hidden
+    Add-RunPidEntry -RunDir $RunDir -Pid $p.Id -AgentId $agentId -RoundNumber $RoundNumber -ScriptName $s.Name -Kind "spawn"
 
     $running += [pscustomobject]@{ Proc=$p; Started=(Get-Date); Script=$s.Name; AgentId=$agentId }
     Write-Log "spawned $($s.Name) pid=$($p.Id)"
@@ -820,6 +861,7 @@ function Invoke-RunAgents {
     if (Test-StopRequested -RepoRoot $RepoRoot -RunDir $RunDir) {
       Write-OrchLog -RunDir $RunDir -Msg "stop_requested killing_running_agents"
       foreach ($rp in $running) {
+        Try-TaskKillTree -Pid $rp.Proc.Id
         try { Stop-Process -Id $rp.Proc.Id -Force -ErrorAction SilentlyContinue } catch { }
       }
       break
@@ -832,6 +874,7 @@ function Invoke-RunAgents {
           $age = ((Get-Date) - $e.Started).TotalSeconds
           if ($age -gt $AgentTimeoutSec) {
             Write-OrchLog -RunDir $RunDir -Msg ("agent_timeout script={0} pid={1} agent={2} age_s={3} timeout_s={4}" -f $e.Script, $e.Proc.Id, $e.AgentId, [int]$age, $AgentTimeoutSec)
+            Try-TaskKillTree -Pid $e.Proc.Id
             try { Stop-Process -Id $e.Proc.Id -Force -ErrorAction SilentlyContinue } catch { }
             if ($e.AgentId -gt 0) {
               Try-KillPythonForAgent -RunDir $RunDir -AgentId $e.AgentId

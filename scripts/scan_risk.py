@@ -109,6 +109,9 @@ def main() -> int:
         for rel in files_scanned:
             if rel == "scripts/scan_risk.py":
                 continue
+            # Avoid self-triggering on other scanners that necessarily contain secret-marker strings.
+            if rel == "scripts/scan_secrets.py":
+                continue
             txt = read_staged_file(repo_root, rel)
             resi = scan_text(txt)
             for pat in resi["secret_patterns"]:

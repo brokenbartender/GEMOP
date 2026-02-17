@@ -39,6 +39,9 @@ Commands:
 
 # Safe URL fetch before Round 1 (no search, no CAPTCHA bypass; just fetch + cache)
 .\start.ps1 -Council -Online -ResearchUrls "https://example.com,https://example.org" -Prompt "..."
+
+# Optional: fail the whole run if it scores below a threshold (useful for unattended runs)
+.\start.ps1 -Council -FailClosedOnThreshold -Threshold 70 -Prompt "..."
 ```
 
 Suggested 12-seat organization (cloud seats first):
@@ -82,6 +85,9 @@ Default behavior:
 - `.\start.ps1 -Council` runs `scripts/stop_agents.ps1` automatically before spawning a new council run.
   - Disable with `-StopOthers:$false`.
 
+Additional reliability detail:
+- The orchestrator records spawned agent PIDs under `<run>/state/pids.json` so `scripts/stop_agents.ps1` can `taskkill /T` process trees.
+
 ## Auto-Apply Patches (Diff Blocks)
 
 In debate mode, Round 1 is “DEBATE & DESIGN”. Rounds 2+ are “ACTUATE & IMPLEMENT”.
@@ -109,6 +115,7 @@ Safety rules (enforced by `scripts/council_patch_apply.py`):
 - Refuses to patch sensitive paths like `.env`, `gcloud_service_key.json`, and anything under `.git/` or `.agent-jobs/`.
 - Default allowlist: only patches to `docs/`, `scripts/`, `mcp/`, `configs/`, and `agents/templates/` are accepted.
 - Runs a lightweight verification step (`python -m compileall scripts mcp`) after applying.
+- Runs a secret scan on the current diff (`python scripts/scan_secrets.py --diff`) when `-VerifyAfterPatches` is enabled.
 
 ## Structured Decisions (DECISION_JSON)
 
