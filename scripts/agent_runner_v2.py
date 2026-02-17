@@ -66,7 +66,134 @@ def log(msg):
     except Exception as e:
         print(f"Logging failed: {e}")
 
+
+def _read_json_file(path: pathlib.Path) -> dict | None:
+    try:
+        if not path.exists():
+            return None
+    except Exception:
+        return None
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        try:
+            return json.loads(path.read_text(errors="ignore"))
+        except Exception:
+            return None
+
+
+def _extract_role_name(prompt: str) -> str:
+    """
+    Best-effort role extraction from the prompt scaffold.
+
+    Supported formats:
+    - [ROLE] Architect
+    - Role: Architect
+    """
+    s = str(prompt or "")
+    # [ROLE] ... (take remainder of that line)
+    try:
+        i = s.find("[ROLE]")
+        if i >= 0:
+            rest = s[i + len("[ROLE]") :]
+            line = rest.splitlines()[0].strip()
+            if line:
+                return line
+    except Exception:
+        pass
+
+    # Role: ...
+    try:
+        m = re.search(r"(?mi)^role\s*:\s*(.+?)\s*$", s)
+        if m:
+            role = (m.group(1) or "").strip()
+            if role:
+                return role
+    except Exception:
+        pass
+
+    return "general"
+
+
+def _service_router_tier_for_role(run_dir: pathlib.Path, role_name: str) -> tuple[str | None, str]:
+    """
+    "Service Router" lookup (decouples workflow roles from model/provider choices).
+
+    Order of precedence:
+    1) Explicit override via GEMINI_OP_SERVICE_ROUTER_PATH (JSON file).
+    2) Run-scoped manifest.json (state/manifest.json -> service_router).
+
+    Returns: (tier, source_path). tier is "local" | "cloud" | None.
+    """
+    src = ""
+    sr: dict | None = None
+
+    override = (os.environ.get("GEMINI_OP_SERVICE_ROUTER_PATH") or "").strip()
+    if override:
+        p = pathlib.Path(override).expanduser()
+        if not p.is_absolute():
+            # Allow relative paths (relative to repo root for consistency with other env config).
+            p = (REPO_ROOT / p).resolve()
+        src = str(p)
+        raw = _read_json_file(p)
+        if isinstance(raw, dict):
+            sr = raw
+
+    if sr is None:
+        mp = run_dir / "state" / "manifest.json"
+        src = str(mp)
+        manifest = _read_json_file(mp)
+        if isinstance(manifest, dict) and isinstance(manifest.get("service_router"), dict):
+            sr = manifest.get("service_router")  # type: ignore[assignment]
+
+    if sr is None:
+        return None, ""
+
+    roles = sr.get("roles")
+    if not isinstance(roles, dict):
+        return None, src
+
+    rn = str(role_name or "").strip()
+    cfg = roles.get(rn)
+    if cfg is None:
+        # Case-insensitive role match (prevents config/key drift).
+        low = rn.lower()
+        for k, v in roles.items():
+            try:
+                if str(k).lower() == low:
+                    cfg = v
+                    break
+            except Exception:
+                continue
+
+    if isinstance(cfg, dict):
+        tier = str(cfg.get("tier") or "").strip().lower()
+        if tier in ("local", "cloud"):
+            return tier, src
+
+    fb = sr.get("fallback")
+    if isinstance(fb, dict):
+        tier = str(fb.get("tier") or "").strip().lower()
+        if tier in ("local", "cloud"):
+            return tier, src
+
+    return None, src
+
+
+def _append_escalation(run_dir: pathlib.Path, row: dict) -> None:
+    try:
+        state_dir = run_dir / "state"
+        state_dir.mkdir(parents=True, exist_ok=True)
+        _append_jsonl(state_dir / "escalations.jsonl", row)
+    except Exception:
+        pass
+
+
 def _stop_files(repo_root: pathlib.Path, run_dir: pathlib.Path):
+    # In mock mode (tests/simulations), ignore global stop flags so a user's prior STOP doesn't break CI/local tests.
+    ignore_global = (os.environ.get("GEMINI_OP_IGNORE_GLOBAL_STOP") or "").strip().lower() in ("1", "true", "yes")
+    if MOCK_MODE or ignore_global:
+        return [run_dir / "state" / "STOP"]
     return [
         repo_root / "STOP_ALL_AGENTS.flag",
         repo_root / "ramshare" / "state" / "STOP",
@@ -884,6 +1011,7 @@ def run_agent(prompt_path, out_md, fallback_model=None):
                     "agent_id": agent_id,
                     "prompt_path": str(prompt_path_obj),
                     "out_md": str(out_md),
+                    "role": "",
                     "tier": "",
                     "backend": "",
                     "model": "",
@@ -897,6 +1025,8 @@ def run_agent(prompt_path, out_md, fallback_model=None):
         # Load Prompt
         prompt = prompt_path_obj.read_text(encoding="utf-8")
         prompt_chars = len(prompt)
+        role_name = _extract_role_name(prompt)
+        service_router_tier, service_router_src = _service_router_tier_for_role(run_dir, role_name)
 
         if not fallback_model:
             fallback_model = (os.environ.get("GEMINI_OP_OLLAMA_MODEL_DEFAULT") or "phi4:latest").strip() or "phi4:latest"
@@ -946,6 +1076,7 @@ def run_agent(prompt_path, out_md, fallback_model=None):
                     "out_md": str(out_md),
                     "prompt_chars": prompt_chars,
                     "result_chars": len(result),
+                    "role": role_name,
                     "tier": selected_tier,
                     "backend": selected_backend,
                     "model": selected_model,
@@ -956,15 +1087,13 @@ def run_agent(prompt_path, out_md, fallback_model=None):
                     "cloud_budget_checked": cloud_budget_checked,
                     "cloud_budget_ok": cloud_budget_ok,
                     "memory_reads": memory_reads,
+                    "service_router_tier": service_router_tier,
+                    "service_router_source": service_router_src,
+                    "forced_local_by_service_router": False,
                 },
             )
             return
-        
-        # Extract simplistic role hint from filename or content if possible
-        role_hint = "general" 
-        if "ROLE" in prompt:
-            role_hint = prompt.split("[ROLE]")[1].split("\n")[0]
-
+         
         # --- PATH INTEGRITY CHECK ---
         if "REPO_ROOT" not in prompt:
             prompt = f"[SYSTEM REINFORCEMENT]\nREPO_ROOT: {REPO_ROOT}\n\n" + prompt
@@ -980,11 +1109,20 @@ def run_agent(prompt_path, out_md, fallback_model=None):
         cloud_budget_ok = None
         spillover_enabled = (os.environ.get("GEMINI_OP_CLOUD_SPILLOVER") or "").strip().lower() in ("1", "true", "yes")
         raise_local_overload = (os.environ.get("GEMINI_OP_LOCAL_OVERLOAD_RAISE") or "1").strip().lower() in ("1", "true", "yes")
-        
-        # --- SMART TIERED ROUTING ---
-        tier = determine_tier(prompt, role_hint)
-        selected_tier = tier
+        forced_local_by_service_router = False
          
+        # --- SMART TIERED ROUTING ---
+        tier = determine_tier(prompt, role_name)
+        # Apply service-router override (fail-closed: local overrides are always honored; cloud overrides only when allowed).
+        if service_router_tier == "local":
+            tier = "local"
+            forced_local_by_service_router = True
+        elif service_router_tier == "cloud":
+            # Only allow forcing cloud when cloud is enabled and local isn't globally forced.
+            if _cloud_allowed() and (os.environ.get("GEMINI_OP_FORCE_LOCAL") or "").strip().lower() not in ("1", "true", "yes"):
+                tier = "cloud"
+        selected_tier = tier
+          
         # Provider router (circuit breaker + retries). Enabled by default for council runs.
         use_router = (os.environ.get("GEMINI_OP_ENABLE_PROVIDER_ROUTER") or "1").strip().lower() in ("1", "true", "yes")
         local_model = select_local_model_for_agent(prompt, fallback_model, agent_id)
@@ -1018,6 +1156,20 @@ def run_agent(prompt_path, out_md, fallback_model=None):
                     # In hybrid mode, treat local overload as a provider failure so router may try cloud spillover.
                     if use_router and spillover_enabled and raise_local_overload and _cloud_allowed() and check_internet():
                         raise LocalOverload(msg)
+                    _append_escalation(
+                        run_dir,
+                        {
+                            "ts": dt.datetime.now().isoformat(),
+                            "kind": "local_overload_low_memory",
+                            "agent_id": agent_id,
+                            "round": round_n,
+                            "role": role_name,
+                            "forced_local_by_service_router": forced_local_by_service_router,
+                            "service_router_tier": service_router_tier,
+                            "reason": "low_memory_refused_local_inference",
+                            "details": {"avail_mb": info.get("avail_mb"), "min_free_mb": info.get("min_free_mb")},
+                        },
+                    )
                     return msg
             except Exception:
                 pass
@@ -1047,6 +1199,20 @@ def run_agent(prompt_path, out_md, fallback_model=None):
                 )
                 if use_router and spillover_enabled and raise_local_overload and _cloud_allowed() and check_internet():
                     raise LocalOverload(msg)
+                _append_escalation(
+                    run_dir,
+                    {
+                        "ts": dt.datetime.now().isoformat(),
+                        "kind": "local_overload_slot_timeout",
+                        "agent_id": agent_id,
+                        "round": round_n,
+                        "role": role_name,
+                        "forced_local_by_service_router": forced_local_by_service_router,
+                        "service_router_tier": service_router_tier,
+                        "reason": "slot_timeout_refused_local_inference",
+                        "details": {"slot_wait_s": slot_wait_s, "max_local_concurrency": max_slots},
+                    },
+                )
                 return msg
             try:
                 return call_ollama(prompt, local_model)
@@ -1113,7 +1279,7 @@ def run_agent(prompt_path, out_md, fallback_model=None):
                     selected_tier = "local"
             providers.append(ProviderSpec(name="local_ollama", model=local_model, call=local_call, retries=0))
             # Optional: allow cloud spillover after local failure/overload for non-cloud seats.
-            if spillover_enabled and check_internet():
+            if spillover_enabled and (not forced_local_by_service_router) and check_internet():
                 providers.append(
                     ProviderSpec(
                         name="cloud_gemini_spillover",
@@ -1177,26 +1343,30 @@ def run_agent(prompt_path, out_md, fallback_model=None):
             log(f"CRITICAL: All models failed for {prompt_path}")
 
         # Lightweight metrics for coordination/scalability tests.
-        _append_jsonl(
-            metrics_path,
-            {
-                "ts": dt.datetime.now().isoformat(),
-                "agent_id": agent_id,
-                "round": round_n,
-                "prompt_path": str(prompt_path_obj),
-                "out_md": str(out_md),
-                "prompt_chars": prompt_chars,
-                "result_chars": 0 if not result else len(result),
-                "tier": selected_tier,
-                "backend": selected_backend,
-                "model": selected_model,
-                "duration_s": round(time.time() - t0, 3),
-                "ok": bool(result),
-                "cloud_budget_checked": cloud_budget_checked,
-                "cloud_budget_ok": cloud_budget_ok,
-                "local_slot_wait_s": slot_wait_s if selected_backend == "ollama" else 0,
-            },
-        )
+            _append_jsonl(
+                metrics_path,
+                {
+                    "ts": dt.datetime.now().isoformat(),
+                    "agent_id": agent_id,
+                    "round": round_n,
+                    "prompt_path": str(prompt_path_obj),
+                    "out_md": str(out_md),
+                    "prompt_chars": prompt_chars,
+                    "result_chars": 0 if not result else len(result),
+                    "role": role_name,
+                    "tier": selected_tier,
+                    "backend": selected_backend,
+                    "model": selected_model,
+                    "duration_s": round(time.time() - t0, 3),
+                    "ok": bool(result),
+                    "cloud_budget_checked": cloud_budget_checked,
+                    "cloud_budget_ok": cloud_budget_ok,
+                    "local_slot_wait_s": slot_wait_s if selected_backend == "ollama" else 0,
+                    "service_router_tier": service_router_tier,
+                    "service_router_source": service_router_src,
+                    "forced_local_by_service_router": forced_local_by_service_router,
+                },
+            )
 
     except Exception as e:
         log(f"CRITICAL FAILURE in run_agent: {e}")
@@ -1212,6 +1382,7 @@ def run_agent(prompt_path, out_md, fallback_model=None):
                     "agent_id": _infer_agent_id(prompt_path),
                     "prompt_path": str(prompt_path_obj),
                     "out_md": str(out_md),
+                    "role": "",
                     "tier": "",
                     "backend": "",
                     "model": "",

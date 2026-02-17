@@ -370,6 +370,22 @@ function Test-StopRequested([string]$RepoRoot, [string]$RunDir) {
   return $false
 }
 
+function Append-Escalation([string]$RunDir, [string]$Kind, [string]$Reason, [hashtable]$Details) {
+  try {
+    $stateDir = Join-Path $RunDir "state"
+    Ensure-Dir $stateDir
+    $p = Join-Path $stateDir "escalations.jsonl"
+    $row = @{
+      ts = (Get-Date -Format o)
+      kind = $Kind
+      reason = $Reason
+    }
+    if ($Details) { $row["details"] = $Details }
+    $line = ($row | ConvertTo-Json -Depth 10 -Compress)
+    Add-Content -LiteralPath $p -Value $line -Encoding UTF8
+  } catch { }
+}
+
 function Write-StopRequested([string]$RepoRoot, [string]$RunDir, [string]$Reason) {
   $r = ""
   try { if ($null -ne $Reason) { $r = [string]$Reason } } catch { $r = "" }
@@ -380,6 +396,9 @@ function Write-StopRequested([string]$RepoRoot, [string]$RunDir, [string]$Reason
       Set-Content -LiteralPath $p -Value ("STOP`r`n" + $r) -Encoding UTF8
     } catch { }
   }
+
+  # Escalation trace: stop is a human-in-the-loop interrupt, so record it explicitly.
+  Append-Escalation -RunDir $RunDir -Kind "stop_requested" -Reason $r -Details @{ repo_root = $RepoRoot; run_dir = $RunDir }
 }
 
 function Start-KillSwitchTimer([string]$RepoRoot, [string]$RunDir, [int]$AfterSec) {
@@ -1608,6 +1627,17 @@ if ($existingRunnerScripts -and $existingRunnerScripts.Count -gt 0) {
 
     Generate-RunScaffold -RepoRoot $RepoRoot -RunDir $RunDir -Prompt $Prompt -TeamCsv $Team -Agents $Agents -CouncilPattern $CouncilPattern -InjectLearningHints:$InjectLearningHints -InjectCapabilityContract:$InjectCapabilityContract -AdversaryIds $adversaryIds -AdversaryMode $AdversaryMode -PoisonPath $PoisonPath -PoisonAgent $PoisonAgent -Ontology $Ontology -OntologyOverrideAgent $OntologyOverrideAgent -OntologyOverride $OntologyOverride -MisinformAgent $MisinformAgent -MisinformText $MisinformText -RoundNumber $r
     Ensure-RunnerScripts -RepoRoot $RepoRoot -RunDir $RunDir -RoundNumber $r -AgentCount $agentCount
+
+    # A2A-style "Agent Cards" (capability advertisement): roles + routing tier + shared tools/skills.
+    try {
+      $ac = Join-Path $RepoRoot "scripts\\agent_cards.py"
+      if (Test-Path -LiteralPath $ac) {
+        & python $ac --repo-root $RepoRoot --run-dir $RunDir --round $r | Out-Null
+        Write-OrchLog -RunDir $RunDir -Msg ("agent_cards_written round={0}" -f $r)
+      }
+    } catch {
+      try { Write-OrchLog -RunDir $RunDir -Msg ("agent_cards_failed round={0} error={1}" -f $r, $_.Exception.Message) } catch { }
+    }
 
     try { Update-RunLedgerRoundEvent -RunDir $RunDir -RoundNumber $r -Event "start" } catch { }
     Write-Log "round $r starting"

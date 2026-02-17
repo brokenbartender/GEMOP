@@ -61,6 +61,58 @@ def _round_plan(pattern: str, max_rounds: int) -> List[Dict[str, Any]]:
     ]
     return base[:mr]
 
+def _default_service_router(*, online: bool) -> Dict[str, Any]:
+    """
+    "Service Router" concept: decouple workflow (roles) from intelligence (models/providers).
+    This is a lightweight, repo-native config that agent_runner_v2 can consult.
+    """
+    # Provider names align with scripts/agent_runner_v2.py provider router.
+    return {
+        "schema_version": 1,
+        "online": bool(online),
+        "roles": {
+            # High-leverage reasoning seats.
+            "Architect": {"tier": "cloud", "providers": ["cloud_gemini"]},
+            "ResearchLead": {"tier": "cloud", "providers": ["cloud_gemini"]},
+            "Engineer": {"tier": "cloud", "providers": ["cloud_gemini"]},
+            "Security": {"tier": "cloud", "providers": ["cloud_gemini"]},
+            # Precision / cost-controlled seats.
+            "Tester": {"tier": "local", "providers": ["local_ollama"]},
+            "Critic": {"tier": "local", "providers": ["local_ollama"]},
+            "Ops": {"tier": "local", "providers": ["local_ollama"]},
+            "Docs": {"tier": "local", "providers": ["local_ollama"]},
+            "Release": {"tier": "local", "providers": ["local_ollama"]},
+        },
+        "fallback": {"tier": "cloud" if online else "local"},
+    }
+
+
+def _manifest_mermaid(manifest: Dict[str, Any]) -> str:
+    rounds = manifest.get("rounds") if isinstance(manifest.get("rounds"), list) else []
+    lines = ["flowchart TD"]
+    lines.append("  start([Start])")
+    prev = "start"
+    for r in rounds:
+        rn = int(r.get("round") or 0) if isinstance(r, dict) else 0
+        if rn <= 0:
+            continue
+        node = f"r{rn}"
+        label = (r.get("goal") or "").replace('"', "'") if isinstance(r, dict) else ""
+        lines.append(f'  {node}["Round {rn}: {label}"]')
+        lines.append(f"  {prev} --> {node}")
+        prev = node
+    lines.append("  end([End])")
+    lines.append(f"  {prev} --> end")
+    # Quality gates (conceptual)
+    lines.append('  gate1{{"DECISION_JSON required"}}')
+    lines.append('  gate2{{"diff blocks required on autopatch"}}')
+    lines.append('  gate3{{"verify pipeline strict"}}')
+    lines.append("  r1 -.-> gate1")
+    lines.append("  r2 -.-> gate1")
+    lines.append("  r2 -.-> gate2")
+    lines.append("  r2 -.-> gate3")
+    return "\n".join(lines).strip() + "\n"
+
 
 def main() -> int:
     ap = argparse.ArgumentParser(description="Generate a run manifest (machine-checkable plan + budgets).")
@@ -112,14 +164,15 @@ def main() -> int:
             "verify_after_patches": bool(args.verify_after_patches),
         },
         "rounds": _round_plan(str(args.pattern), int(args.max_rounds)),
+        "service_router": _default_service_router(online=bool(args.online)),
     }
 
     out_path = state_dir / "manifest.json"
     out_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+    (state_dir / "manifest.mmd").write_text(_manifest_mermaid(manifest), encoding="utf-8")
     print(json.dumps({"ok": True, "manifest_path": str(out_path)}, indent=2))
     return 0
 
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

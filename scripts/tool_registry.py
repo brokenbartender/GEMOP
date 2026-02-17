@@ -40,6 +40,12 @@ TOOLS: List[Dict[str, Any]] = [
         "desc": "Writes state/manifest.json for machine-checkable budgets/plan.",
     },
     {
+        "id": "agent_cards",
+        "kind": "coordination",
+        "path": "scripts/agent_cards.py",
+        "desc": "Writes state/agent_cards.json (A2A-style 'Agent Cards' for dynamic routing/team introspection).",
+    },
+    {
         "id": "contract_repair",
         "kind": "quality",
         "path": "scripts/contract_repair.py",
