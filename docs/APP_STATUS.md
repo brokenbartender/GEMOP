@@ -5,9 +5,6 @@ It is the single source of truth for the current runtime shape and counts.
 
 ## Entry Points
 - `start.ps1 -Council` (multi-agent council orchestrator)
-- `start.ps1 -Brain -Dashboard` (optional; requires Brain modules)
-- `scripts/sovereign_brain.py` (optional; direct brain entry)
-- `start.ps1 -Mouth` (optional; single-terminal REPL -> NeuralBus -> Executive Core)
 
 ## Intelligence Routing
 - Council hybrid router: `scripts/agent_runner_v2.py`
@@ -22,7 +19,7 @@ It is the single source of truth for the current runtime shape and counts.
 - World-state rebuilder (blackout/drift resilience): `scripts/state_rebuilder.py`
 
 ## Skills
-- Local skills (`agents/skills/skill_*.py`): **31**
+- Local skills (`agents/skills/skill_*.py`): **0**
 - Global skills (skills registry): **1267**
 
 ## UIs

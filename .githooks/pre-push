@@ -1,0 +1,22 @@
+#!/usr/bin/env sh
+set -eu
+
+branch="$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo '')"
+
+# Never push local-only/WIP branches unless explicitly overridden.
+case "$branch" in
+  wip/*|*local-only*)
+    if [ "${ALLOW_WIP_PUSH:-}" != "1" ]; then
+      echo "ERROR: Refusing to push branch '$branch'." >&2
+      echo "Set ALLOW_WIP_PUSH=1 to override." >&2
+      exit 1
+    fi
+    ;;
+esac
+
+# Best-effort: scan staged state as a last check. (Pre-push cannot easily reconstruct
+# the exact push range portably; this is still better than nothing.)
+python scripts/scan_risk.py --staged >/dev/null || true
+
+exit 0
+

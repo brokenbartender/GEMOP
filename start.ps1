@@ -18,6 +18,13 @@ param(
   [int]$QuotaCloudCallsPerAgent = 0, # Council mode: per-agent cloud call budget (optional).
   [int]$CloudSeats = 3, # Council mode: only first N agents may use cloud when -Online.
   [int]$MaxLocalConcurrency = 2, # Council mode: cap concurrent local Ollama calls (quota-cliff safety).
+  [switch]$Resume, # Council mode: skip agents already completed for the round.
+  [switch]$ExtractDecisions, # Council mode: extract DECISION_JSON blocks into run state.
+  [switch]$RequireDecisionJson, # Council mode: stop run if DECISION_JSON is missing.
+  [switch]$VerifyAfterPatches, # Council mode: run verification pipeline after implementation rounds.
+  [switch]$AdaptiveConcurrency, # Council mode: reduce parallelism when overload/latency is detected.
+  [string]$ResearchUrls = "", # Council mode: safe URL fetch before Round 1 (when -Online).
+  [string]$ResearchUrlsFile = "", # Council mode: file of URLs (one per line) to fetch before Round 1.
   [switch]$SaveTokens,
   [switch]$Dashboard,
   [switch]$SkipDocCheck,
@@ -153,6 +160,13 @@ if ($Council) {
     )
     if ($Online) { $args += "-Online" }
     if ($AutoApplyPatches) { $args += "-AutoApplyPatches" }
+    if ($Resume) { $args += "-Resume" }
+    if ($ExtractDecisions) { $args += "-ExtractDecisions" }
+    if ($RequireDecisionJson) { $args += "-RequireDecisionJson" }
+    if ($VerifyAfterPatches) { $args += "-VerifyAfterPatches" }
+    if ($AdaptiveConcurrency) { $args += "-AdaptiveConcurrency" }
+    if ($ResearchUrls) { $args += @("-ResearchUrls", $ResearchUrls) }
+    if ($ResearchUrlsFile) { $args += @("-ResearchUrlsFile", $ResearchUrlsFile) }
     if ($QuotaCloudCalls -gt 0) { $args += @("-QuotaCloudCalls", "$QuotaCloudCalls") }
     if ($QuotaCloudCallsPerAgent -gt 0) { $args += @("-QuotaCloudCallsPerAgent", "$QuotaCloudCallsPerAgent") }
     if ($Prompt) { $args += @("-Prompt", $Prompt) }

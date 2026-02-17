@@ -7,11 +7,11 @@ Goal:
 ## Roles
 
 - Server (desktop):
-  - repo at `C:\Gemini`
+  - repo at `<REPO_ROOT>`
   - pushes `ramshare` over SSH (optional)
   - runs daemons/watchdog/automation
 - Workstation (laptop):
-  - repo at `C:\Users\codym\Gemini-op`
+  - repo at `<REPO_ROOT>` (on the laptop)
   - pulls `ramshare` from server every 5 minutes
   - interactive coding and Gemini sessions
 
@@ -20,14 +20,14 @@ Goal:
 Run on desktop:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File C:\Gemini\scripts\setup-ssh-ramshare-permanent.ps1 -LaptopHost Gemini-laptop -LaptopAddress <LAPTOP_IP> -LaptopUser codym -RemoteRepoRoot ~/Gemini-op
+powershell -NoProfile -ExecutionPolicy Bypass -File <REPO_ROOT>\scripts\setup-ssh-ramshare-permanent.ps1 -LaptopHost Gemini-laptop -LaptopAddress <LAPTOP_IP> -LaptopUser <LAPTOP_USER> -RemoteRepoRoot <REMOTE_REPO_ROOT>
 ```
 
 Manual test:
 
 ```powershell
 ssh Gemini-laptop hostname
-powershell -NoProfile -ExecutionPolicy Bypass -File C:\Gemini\scripts\sync-ramshare.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File <REPO_ROOT>\scripts\sync-ramshare.ps1
 ```
 
 Expected:
@@ -96,13 +96,13 @@ Host Gemini-server
 Run this on each machine after pulling latest:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\optimize-workspace-layout.ps1 -RepoRoot C:\Gemini
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\optimize-workspace-layout.ps1 -RepoRoot <REPO_ROOT>
 ```
 
 For laptop repo path:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\optimize-workspace-layout.ps1 -RepoRoot C:\Users\codym\Gemini-op
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\optimize-workspace-layout.ps1 -RepoRoot <REPO_ROOT>
 ```
 
 This normalizes:
@@ -116,7 +116,7 @@ This normalizes:
 If desktop resolves `Gemini-laptop` to itself, run this on desktop with your real laptop IP:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File C:\Gemini\scripts\setup-ssh-ramshare-permanent.ps1 -LaptopHost Gemini-laptop -LaptopAddress <REAL_LAPTOP_IP> -LaptopUser codym -RemoteRepoRoot ~/Gemini-op
+powershell -NoProfile -ExecutionPolicy Bypass -File <REPO_ROOT>\scripts\setup-ssh-ramshare-permanent.ps1 -LaptopHost Gemini-laptop -LaptopAddress <REAL_LAPTOP_IP> -LaptopUser <LAPTOP_USER> -RemoteRepoRoot <REMOTE_REPO_ROOT>
 ```
 
 Then verify:
@@ -131,5 +131,5 @@ Expected:
 Finally test sync:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File C:\Gemini\scripts\sync-ramshare.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File <REPO_ROOT>\scripts\sync-ramshare.ps1
 ```

@@ -16,6 +16,9 @@ Commands:
 # Tiered council (cloud enabled when available; local fallback)
 .\start.ps1 -Council -Online -Prompt "..."
 
+# Resume a run dir safely (skips agents whose round output already ends with COMPLETED)
+.\start.ps1 -Council -Resume -Prompt "..."
+
 # More seats
 .\start.ps1 -Council -Agents 12 -Prompt "..."
 
@@ -30,6 +33,12 @@ Commands:
 
 # Extra stability: reduce concurrent processes if your machine is CPU/RAM constrained
 .\start.ps1 -Council -Agents 12 -MaxParallel 2 -Prompt "..."
+
+# Adaptive concurrency (conservative reductions based on prior round metrics)
+.\start.ps1 -Council -AdaptiveConcurrency -Prompt "..."
+
+# Safe URL fetch before Round 1 (no search, no CAPTCHA bypass; just fetch + cache)
+.\start.ps1 -Council -Online -ResearchUrls "https://example.com,https://example.org" -Prompt "..."
 ```
 
 Suggested 12-seat organization (cloud seats first):
@@ -48,6 +57,7 @@ Implementation detail:
 - Cloud routing is gated by `GEMINI_OP_ALLOW_CLOUD=1` (set by `scripts/triad_orchestrator.ps1` when `-Online` is used) and the normal checks inside `scripts/agent_runner_v2.py`.
 - Seat allocation is controlled by `GEMINI_OP_CLOUD_AGENT_IDS` (set by `-CloudSeats`).
 - Local fallback concurrency is controlled by `GEMINI_OP_MAX_LOCAL_CONCURRENCY` (set by `-MaxLocalConcurrency`) via a file-based semaphore in `scripts/agent_runner_v2.py`.
+- Provider routing uses a circuit breaker to avoid hammering failing backends: `scripts/provider_router.py` persists state to `<run>/state/providers.json`.
 - Optional fast-local path: set `GEMINI_OP_ENABLE_FAST_LOCAL=1` and `GEMINI_OP_OLLAMA_MODEL_FAST=phi3:mini` to route routine formatting/extraction tasks to a lighter local model.
 - Optional per-seat local model mapping: set `GEMINI_OP_OLLAMA_MODEL_AGENT_<N>` to pin a specific seat to a specific local model.
   - Example: `GEMINI_OP_OLLAMA_MODEL_AGENT_1=phi4:latest`, `GEMINI_OP_OLLAMA_MODEL_AGENT_2=phi3:mini`.
@@ -89,12 +99,28 @@ Commands:
 
 # Tiered + auto-apply
 .\start.ps1 -Council -Online -AutoApplyPatches -Prompt "..."
+
+# Auto-apply + verification pipeline (compileall + git diff --check)
+.\start.ps1 -Council -AutoApplyPatches -VerifyAfterPatches -Prompt "..."
 ```
 
 Safety rules (enforced by `scripts/council_patch_apply.py`):
 - Rejects “guardrail weakening” diffs (uses the same detection logic as the supervisor).
 - Refuses to patch sensitive paths like `.env`, `gcloud_service_key.json`, and anything under `.git/` or `.agent-jobs/`.
+- Default allowlist: only patches to `docs/`, `scripts/`, `mcp/`, `configs/`, and `agents/templates/` are accepted.
 - Runs a lightweight verification step (`python -m compileall scripts mcp`) after applying.
+
+## Structured Decisions (DECISION_JSON)
+
+Each agent is prompted to include a structured `DECISION_JSON` block in its markdown output.
+After each round, the orchestrator can extract them into `<run>/state/decisions/`:
+
+```powershell
+.\start.ps1 -Council -ExtractDecisions -Prompt "..."
+.\start.ps1 -Council -RequireDecisionJson -Prompt "..."
+```
+
+Extractor: `scripts/extract_agent_decisions.py`.
 
 ## Token Usage (Cloud)
 

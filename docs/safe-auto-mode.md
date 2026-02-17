@@ -20,7 +20,7 @@ This mode runs `Gemini --full-auto` on an isolated branch and checkpoints change
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\safe-auto-run.ps1 `
   -Task "app-build-pass-1" `
-  -RepoRoot "C:\Users\codym\Gemini-op" `
+  -RepoRoot "<REPO_ROOT>" `
   -CheckpointSeconds 60 `
   -MaxCheckpoints 200 `
   -GeminiArgs "--full-auto"

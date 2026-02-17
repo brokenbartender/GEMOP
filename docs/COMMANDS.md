@@ -5,9 +5,9 @@ This is the consolidated command list for the current A2A + multi-agent workflow
 ## 1) Repo + Sync
 
 ```powershell
-git -C C:\Users\codym\Gemini-op fetch --all --prune
-git -C C:\Users\codym\Gemini-op status --short
-git -C C:\Users\codym\Gemini-op pull --ff-only
+git -C <REPO_ROOT> fetch --all --prune
+git -C <REPO_ROOT> status --short
+git -C <REPO_ROOT> pull --ff-only
 ```
 
 ## 2) A2A Worker Control (global utility)

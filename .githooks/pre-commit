@@ -1,0 +1,13 @@
+#!/usr/bin/env sh
+set -eu
+
+# 1) Keep the generated status doc fresh.
+python scripts/update_app_status.py >/dev/null 2>&1 || python scripts/update_app_status.py
+git add docs/APP_STATUS.md >/dev/null 2>&1 || true
+python scripts/update_app_status.py --check
+
+# 2) Fail closed on obvious secrets and risky code unless explicitly overridden.
+python scripts/scan_risk.py --staged >/dev/null
+
+exit 0
+

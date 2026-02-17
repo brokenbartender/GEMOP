@@ -76,7 +76,24 @@ param(
  
   # If enabled, apply unified-diff blocks from the best agent output in implementation rounds.
   [switch]$AutoApplyPatches,
-  [switch]$AutoApplyMcpCapabilities
+  [switch]$AutoApplyMcpCapabilities,
+
+  # New: optional web research ingestion (safe URL fetch only) before Round 1.
+  [string]$ResearchUrls = "",
+  [string]$ResearchUrlsFile = "",
+
+  # New: extract structured decisions from agent outputs and optionally require them.
+  [switch]$ExtractDecisions,
+  [switch]$RequireDecisionJson,
+
+  # New: run verification pipeline after implementation rounds.
+  [switch]$VerifyAfterPatches,
+
+  # New: adaptive concurrency (reduce parallelism when local overload/latency is detected).
+  [switch]$AdaptiveConcurrency,
+
+  # New: resumable runs (skip agents whose round outputs already exist and are COMPLETE).
+  [switch]$Resume
 )
 
 Set-StrictMode -Version Latest
@@ -448,6 +465,12 @@ function Generate-RunScaffold {
       $world = "[WORLD STATE - LAST SNAPSHOT]`r`n$world`r`n`r`n"
     }
 
+    $sources = Read-Text (Join-Path $RunDir "state\\sources.md")
+    if ($sources) {
+      if ($sources.Length -gt 4000) { $sources = $sources.Substring(0, 4000) }
+      $sources = "[RESEARCH SOURCES - FETCHED]`r`n$sources`r`n`r`n"
+    }
+
     $cap = ""
     if ($InjectCapabilityContract) {
       $cap = @"
@@ -544,7 +567,7 @@ $pt
     }
 
     $body = @"
-$world$anchor$lessons$header
+$world$sources$anchor$lessons$header
 $cap$supervisorMemo$ownerBlock$onto$misinfo$adv$poison
 [OPERATIONAL CONTEXT]
 REPO_ROOT: $RepoRoot
@@ -561,6 +584,10 @@ $roundTask
 [OUTPUT CONTRACT]
 - Cite exact repo file paths.
 - Include at least one verification command.
+- Include a `DECISION_JSON` block:
+  ```json DECISION_JSON
+  {"summary":"...","files":["..."],"commands":["..."],"risks":["..."],"confidence":0.0}
+  ```
 - If an ontology is present, include a first-line `ONTOLOGY_ACK: urgent_definition=<...>` and flag mismatches you detect.
 - End with COMPLETED.
 "@
@@ -680,7 +707,9 @@ function Invoke-RunAgents {
     [string]$RunDir,
     [int]$MaxParallel,
     [int[]]$SkipAgentIds,
-    [int]$AgentTimeoutSec = 0
+    [int]$AgentTimeoutSec = 0,
+    [int]$RoundNumber = 0,
+    [switch]$Resume
   )
 
   $scripts = @(Get-ChildItem -LiteralPath $RunDir -Filter "run-agent*.ps1" | Sort-Object Name)
@@ -765,6 +794,19 @@ function Invoke-RunAgents {
     try {
       if ($s.BaseName -match '^run-agent(\d+)$') { $agentId = [int]$Matches[1] }
     } catch { $agentId = 0 }
+
+    if ($Resume -and $RoundNumber -gt 0 -and $agentId -gt 0) {
+      try {
+        $outPath = Join-Path $RunDir ("round{0}_agent{1}.md" -f $RoundNumber, $agentId)
+        if (Test-Path -LiteralPath $outPath) {
+          $txt = Read-Text $outPath
+          if ($txt -and ($txt -match "(?m)^COMPLETED\\s*$")) {
+            Write-OrchLog -RunDir $RunDir -Msg ("resume_skip round={0} agent={1} reason=already_completed" -f $RoundNumber, $agentId)
+            continue
+          }
+        }
+      } catch { }
+    }
 
     $p = Start-Process -FilePath "powershell.exe" -ArgumentList @(
       "-NoProfile","-ExecutionPolicy","Bypass","-File", "`"$($s.FullName)`""
@@ -1007,7 +1049,7 @@ if ($existingRunnerScripts -and $existingRunnerScripts.Count -gt 0) {
 
     Write-Log "round $r starting"
     Write-OrchLog -RunDir $RunDir -Msg "round_start round=$r"
-    Invoke-RunAgents -RunDir $RunDir -MaxParallel $MaxParallel -SkipAgentIds $skipAgentIds -AgentTimeoutSec $AgentTimeoutSec
+    Invoke-RunAgents -RunDir $RunDir -MaxParallel $MaxParallel -SkipAgentIds $skipAgentIds -AgentTimeoutSec $AgentTimeoutSec -RoundNumber $r -Resume:$Resume
     if (-not (Test-StopRequested -RepoRoot $RepoRoot -RunDir $RunDir)) {
       Ensure-AgentRoundOutputs -RunDir $RunDir -RoundNumber $r -AgentCount $agentCount -SkipAgentIds $skipAgentIds -AgentTimeoutSec $AgentTimeoutSec
     } else {
@@ -1015,6 +1057,23 @@ if ($existingRunnerScripts -and $existingRunnerScripts.Count -gt 0) {
     }
     Write-Log "round $r complete"
     Write-OrchLog -RunDir $RunDir -Msg "round_complete round=$r"
+
+    if ($ExtractDecisions -or $RequireDecisionJson) {
+      try {
+        $ed = Join-Path $RepoRoot "scripts\\extract_agent_decisions.py"
+        if (Test-Path -LiteralPath $ed) {
+          $ea = @("--run-dir",$RunDir,"--round",$r,"--agent-count",$agentCount)
+          if ($RequireDecisionJson) { $ea += "--require" }
+          & python $ed @ea | Out-Null
+          Write-OrchLog -RunDir $RunDir -Msg ("decisions_extracted round={0}" -f $r)
+        }
+      } catch {
+        Write-OrchLog -RunDir $RunDir -Msg ("decisions_extract_failed round={0} error={1}" -f $r, $_.Exception.Message)
+        if ($RequireDecisionJson) {
+          Write-StopRequested -RepoRoot $RepoRoot -RunDir $RunDir -Reason ("missing_decisions round={0}" -f $r)
+        }
+      }
+    }
 
     # Deterministic supervisor: emits verify/challenge + safe summaries to the council bus.
     if ($supervisorOn) {
@@ -1087,6 +1146,19 @@ if ($existingRunnerScripts -and $existingRunnerScripts.Count -gt 0) {
       }
     }
 
+    if ($VerifyAfterPatches -and $r -ge 2 -and -not (Test-StopRequested -RepoRoot $RepoRoot -RunDir $RunDir)) {
+      try {
+        $vp = Join-Path $RepoRoot "scripts\\verify_pipeline.py"
+        if (Test-Path -LiteralPath $vp) {
+          & python $vp --repo-root $RepoRoot --run-dir $RunDir --strict | Out-Null
+          Write-OrchLog -RunDir $RunDir -Msg ("verify_pipeline round={0} ok" -f $r)
+        }
+      } catch {
+        Write-OrchLog -RunDir $RunDir -Msg ("verify_pipeline_failed round={0} error={1}" -f $r, $_.Exception.Message)
+        Write-StopRequested -RepoRoot $RepoRoot -RunDir $RunDir -Reason ("verify_failed round={0}" -f $r)
+      }
+    }
+
     if ($CouncilPattern -ne "debate") { break }
     if (Test-StopRequested -RepoRoot $RepoRoot -RunDir $RunDir) {
       Write-OrchLog -RunDir $RunDir -Msg ("stop_requested after_round={0}" -f $r)
@@ -1110,7 +1182,7 @@ if ($EnableCouncilBus) {
 }
 
 if ($existingRunnerScripts -and $existingRunnerScripts.Count -gt 0) {
-  Invoke-RunAgents -RunDir $RunDir -MaxParallel $MaxParallel -SkipAgentIds $skipAgentIds -AgentTimeoutSec $AgentTimeoutSec
+  Invoke-RunAgents -RunDir $RunDir -MaxParallel $MaxParallel -SkipAgentIds $skipAgentIds -AgentTimeoutSec $AgentTimeoutSec -RoundNumber 1 -Resume:$Resume
   if ($supervisorOn) {
     try {
       $supArgs = @("--run-dir",$RunDir,"--round",1,"--agent-count",$agentCount,"--repo-root",$RepoRoot)
@@ -1156,3 +1228,37 @@ Write-Log "OK"
 Write-OrchLog -RunDir $RunDir -Msg "exit ok"
 exit 0
 
+    # Optional: ingest safe URL sources for agents before the first round.
+    if ($r -eq 1 -and $Online -and (-not [string]::IsNullOrWhiteSpace($ResearchUrls) -or -not [string]::IsNullOrWhiteSpace($ResearchUrlsFile))) {
+      try {
+        $fetch = Join-Path $RepoRoot "scripts\\web_research_fetch.py"
+        if (Test-Path -LiteralPath $fetch) {
+          $wa = @("--run-dir",$RunDir)
+          if ($ResearchUrls) { $wa += @("--urls",$ResearchUrls) }
+          if ($ResearchUrlsFile) { $wa += @("--urls-file",$ResearchUrlsFile) }
+          & python $fetch @wa | Out-Null
+          Write-OrchLog -RunDir $RunDir -Msg "web_research_fetched ok"
+        }
+      } catch {
+        Write-OrchLog -RunDir $RunDir -Msg ("web_research_fetch_failed error={0}" -f $_.Exception.Message)
+      }
+    }
+
+    # Optional: adaptive concurrency based on prior metrics (conservative reductions only).
+    if ($AdaptiveConcurrency -and $r -ge 2) {
+      try {
+        $ac = Join-Path $RepoRoot "scripts\\adaptive_concurrency.py"
+        if (Test-Path -LiteralPath $ac) {
+          & python $ac --run-dir $RunDir --current-max-parallel $MaxParallel --current-max-local $MaxLocalConcurrency | Out-Null
+          $cc = Read-JsonOrNull -Path (Join-Path $RunDir "state\\concurrency.json")
+          if ($cc -and $cc.recommended) {
+            $MaxParallel = [int]$cc.recommended.max_parallel
+            $MaxLocalConcurrency = [int]$cc.recommended.max_local_concurrency
+            $env:GEMINI_OP_MAX_LOCAL_CONCURRENCY = "$MaxLocalConcurrency"
+            Write-OrchLog -RunDir $RunDir -Msg ("adaptive_concurrency round={0} max_parallel={1} max_local={2}" -f $r, $MaxParallel, $MaxLocalConcurrency)
+          }
+        }
+      } catch {
+        Write-OrchLog -RunDir $RunDir -Msg ("adaptive_concurrency_failed error={0}" -f $_.Exception.Message)
+      }
+    }

@@ -12,6 +12,7 @@ import urllib.error
 
 # Local helper: resolves repo root via env var or file location.
 from repo_paths import get_repo_root
+from provider_router import CircuitBreaker, ProviderRouter, ProviderSpec
 
 # Fast-path for deterministic redteam runs: avoid heavy imports per process.
 MOCK_MODE = (os.environ.get("GEMINI_OP_MOCK_MODE") or "").strip().lower() in ("1", "true", "yes")
@@ -969,39 +970,13 @@ def run_agent(prompt_path, out_md, fallback_model=None):
         tier = determine_tier(prompt, role_hint)
         selected_tier = tier
          
-        # TIER 0: CLOUD (Smart/Web)
-        if tier == "cloud":
-            if not _cloud_allowed_for(agent_id):
-                log("Cloud not allowed for this agent; downgrading to local.")
-                tier = "local"
-                selected_tier = "local"
-            elif check_internet():
-                cloud_budget_checked = budgets_enabled
-                cloud_budget_ok = bool(_take_cloud_call_budget(REPO_ROOT, run_dir, agent_id))
-                if not cloud_budget_ok:
-                    log("QUOTA: cloud budget exhausted; downgrading to local.")
-                    tier = "local"
-                    selected_tier = "local"
-                else:
-                    selected_backend = "gemini_cloud"
-                    selected_model = "gemini-2.5-flash"
-                    if _is_stopped(REPO_ROOT, run_dir):
-                        log("STOP requested before cloud call; aborting.")
-                        sys.exit(2)
-                    result = call_gemini_cloud_modern(prompt)
-            else:
-                log("Offline mode detected. Downgrading to Local.")
-                tier = "local"
-                selected_tier = "local"
+        # Provider router (circuit breaker + retries). Enabled by default for council runs.
+        use_router = (os.environ.get("GEMINI_OP_ENABLE_PROVIDER_ROUTER") or "1").strip().lower() in ("1", "true", "yes")
+        local_model = select_local_model_for_agent(prompt, fallback_model, agent_id)
 
-        # TIER 1: LOCAL OLLAMA (Efficiency/Fallback)
-        if tier == "local" or not result:
-            if not result and tier == "cloud":
-                log(f"Cloud tier unavailable or failed. Engaging Local Fallback to {fallback_model}.")
-            
-            # For "Most Powerful" local, ensures we use the requested fallback
+        def local_call() -> str:
+            nonlocal slot_wait_s, selected_backend, selected_model
             selected_backend = "ollama"
-            local_model = select_local_model_for_agent(prompt, fallback_model, agent_id)
             selected_model = local_model
             if _is_stopped(REPO_ROOT, run_dir):
                 log("STOP requested before local call; aborting.")
@@ -1015,7 +990,7 @@ def run_agent(prompt_path, out_md, fallback_model=None):
             max_slots = _read_int_env("GEMINI_OP_MAX_LOCAL_CONCURRENCY", 0)
             if max_slots > 0 and slot is None:
                 log(f"LOCAL_SLOT_TIMEOUT: agent_id={agent_id} waited_s={slot_wait_s} max_slots={max_slots}")
-                result = (
+                return (
                     "LOCAL_OVERLOAD: Unable to acquire a local Ollama slot within the configured timeout.\n"
                     f"- agent_id: {agent_id}\n"
                     f"- max_local_concurrency: {max_slots}\n"
@@ -1030,11 +1005,91 @@ def run_agent(prompt_path, out_md, fallback_model=None):
                     "\n"
                     "COMPLETED\n"
                 )
+            try:
+                return call_ollama(prompt, local_model)
+            finally:
+                _release_local_slot(slot)
+
+        def cloud_budget_ok_for(_provider: str) -> bool:
+            # Enforce cloud allowlist and shared budgets.
+            if not _cloud_allowed_for(agent_id):
+                return False
+            if not check_internet():
+                return False
+            if budgets_enabled:
+                nonlocal cloud_budget_checked, cloud_budget_ok
+                cloud_budget_checked = True
+                cloud_budget_ok = bool(_take_cloud_call_budget(REPO_ROOT, run_dir, agent_id))
+                return bool(cloud_budget_ok)
+            return True
+
+        if use_router:
+            circuit = CircuitBreaker(run_dir / "state" / "providers.json", open_for_s=_read_int_env("GEMINI_OP_PROVIDER_CIRCUIT_OPEN_S", 120))
+            router = ProviderRouter(
+                circuit=circuit,
+                budget_ok=lambda name: cloud_budget_ok_for(name) if name.startswith("cloud") else True,
+            )
+
+            providers: list[ProviderSpec] = []
+            if tier == "cloud":
+                if _cloud_allowed_for(agent_id) and check_internet():
+                    selected_backend = "gemini_cloud"
+                    selected_model = "gemini-2.5-flash"
+                    providers.append(
+                        ProviderSpec(
+                            name="cloud_gemini",
+                            model="gemini-2.5-flash",
+                            call=lambda: call_gemini_cloud_modern(prompt),
+                            retries=_read_int_env("GEMINI_OP_CLOUD_RETRIES", 1),
+                        )
+                    )
+                else:
+                    selected_tier = "local"
+            providers.append(ProviderSpec(name="local_ollama", model=local_model, call=local_call, retries=0))
+
+            rr = router.route(providers)
+            if rr.ok:
+                result = rr.text
+                selected_backend = rr.provider
+                selected_model = rr.model
+                selected_tier = "cloud" if rr.provider.startswith("cloud") else "local"
             else:
-                try:
-                    result = call_ollama(prompt, local_model)
-                finally:
-                    _release_local_slot(slot)
+                # Router failed; ensure we at least attempt local once.
+                if rr.provider and rr.provider.startswith("cloud"):
+                    log(f"Cloud route failed: {rr.error}; falling back to local.")
+                result = local_call()
+                selected_tier = "local"
+        else:
+            # Legacy routing (kept for emergency fallback).
+            if tier == "cloud":
+                if not _cloud_allowed_for(agent_id):
+                    log("Cloud not allowed for this agent; downgrading to local.")
+                    tier = "local"
+                    selected_tier = "local"
+                elif check_internet():
+                    cloud_budget_checked = budgets_enabled
+                    cloud_budget_ok = bool(_take_cloud_call_budget(REPO_ROOT, run_dir, agent_id))
+                    if not cloud_budget_ok:
+                        log("QUOTA: cloud budget exhausted; downgrading to local.")
+                        tier = "local"
+                        selected_tier = "local"
+                    else:
+                        selected_backend = "gemini_cloud"
+                        selected_model = "gemini-2.5-flash"
+                        if _is_stopped(REPO_ROOT, run_dir):
+                            log("STOP requested before cloud call; aborting.")
+                            sys.exit(2)
+                        result = call_gemini_cloud_modern(prompt)
+                else:
+                    log("Offline mode detected. Downgrading to Local.")
+                    tier = "local"
+                    selected_tier = "local"
+
+            if tier == "local" or not result:
+                if not result and tier == "cloud":
+                    log(f"Cloud tier unavailable or failed. Engaging Local Fallback to {fallback_model}.")
+                result = local_call()
+                selected_tier = "local"
         
         if result:
             pathlib.Path(out_md).write_text(result, encoding="utf-8")

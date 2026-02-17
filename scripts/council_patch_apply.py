@@ -24,6 +24,19 @@ BLOCKED_PREFIXES = (
     ".agent-jobs/",
 )
 
+# Default allowlist: only apply patches to these paths. This reduces risk of
+# "diffs" that modify tooling or sensitive areas outside the app surface.
+ALLOWED_PREFIXES = (
+    "docs/",
+    "scripts/",
+    "mcp/",
+    "configs/",
+    "agents/templates/",
+)
+
+MAX_PATCH_BYTES = 200_000
+MAX_TOUCHED_FILES = 25
+
 
 def _norm_path(p: str) -> str:
     s = (p or "").strip().replace("\\\\", "/")
@@ -223,8 +236,8 @@ def main() -> int:
         return 3
 
     diff_blocks = extract_diff_blocks(out_txt)
-    combined = "\n\n".join(b.strip("\n") for b in diff_blocks if b.strip())
-    touched = touched_files_from_patch(combined)
+    # Apply each fenced diff block independently; this makes rollback and reporting safer.
+    blocks = [b.strip("\n") for b in diff_blocks if b.strip()]
 
     report: dict[str, Any] = {
         "ok": True,
@@ -232,98 +245,111 @@ def main() -> int:
         "agent": agent_id,
         "output_path": str(out_path),
         "diff_blocks": len(diff_blocks),
-        "touched_files": touched,
+        "blocks": [],
         "dry_run": bool(args.dry_run),
         "ts": time.time(),
     }
 
-    if not combined.strip():
+    if not blocks:
         report["ok"] = True
         report["note"] = "no_diff_blocks_found"
         (state_dir / f"patch_apply_round{round_n}.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
         return 0
 
-    blocked = [p for p in touched if is_blocked(p)]
-    if blocked:
-        report["ok"] = False
-        report["reason"] = "blocked_file_touched"
-        report["blocked"] = blocked[:50]
-        (state_dir / f"patch_apply_round{round_n}.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
-        return 4
-
-    patch_path = state_dir / f"patch_round{round_n}_agent{agent_id}.diff"
-    patch_path.write_text(combined.strip() + "\n", encoding="utf-8")
-
-    # Fail closed: ensure patch is applicable before making any changes.
-    chk = run(["git", "apply", "--check", str(patch_path)], cwd=repo_root)
-    report["git_apply_check_rc"] = chk.returncode
-    if chk.stdout:
-        report["git_apply_check_stdout"] = chk.stdout[-4000:]
-    if chk.stderr:
-        report["git_apply_check_stderr"] = chk.stderr[-4000:]
-    if chk.returncode != 0:
-        # Salvage path: some models emit "almost unified diff" blocks for new docs files
-        # where indented lines are missing the leading '+' markers, causing `git apply` to fail.
-        # For safety, only salvage *brand-new* markdown files under docs/.
+    # Skip if we already successfully applied this round.
+    prior = state_dir / f"patch_apply_round{round_n}.json"
+    if prior.exists():
         try:
-            if (
-                len(touched) == 1
-                and not is_blocked(touched[0])
-                and _is_new_file_patch(combined, touched[0])
-                and _salvage_new_file_markdown(combined, repo_root=repo_root, path_rel=touched[0])
-            ):
-                report["ok"] = True
-                report["note"] = "salvaged_new_file_markdown"
-                report["salvaged_file"] = _norm_path(touched[0])
-                if args.verify:
-                    ver = run([sys.executable, "-m", "compileall", "scripts", "mcp"], cwd=repo_root)
-                    report["verify_rc"] = ver.returncode
-                    if ver.stdout:
-                        report["verify_stdout"] = ver.stdout[-4000:]
-                    if ver.stderr:
-                        report["verify_stderr"] = ver.stderr[-4000:]
-                    if ver.returncode != 0:
-                        report["ok"] = False
-                        report["reason"] = "verify_failed"
+            obj = read_json(prior)
+            if isinstance(obj, dict) and obj.get("ok") is True and obj.get("note") not in ("no_diff_blocks_found",):
+                report["note"] = "already_applied"
                 (state_dir / f"patch_apply_round{round_n}.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
-                return 0 if report.get("ok") else 7
+                return 0
         except Exception:
             pass
 
-        report["ok"] = False
-        report["reason"] = "git_apply_check_failed"
-        (state_dir / f"patch_apply_round{round_n}.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
-        return 5
+    allow_any = bool(os.environ.get("GEMINI_OP_PATCH_APPLY_ALLOW_ANY"))
 
-    if not args.dry_run:
-        aply = run(["git", "apply", "--whitespace=nowarn", str(patch_path)], cwd=repo_root)
-        report["git_apply_rc"] = aply.returncode
-        if aply.stdout:
-            report["git_apply_stdout"] = aply.stdout[-4000:]
-        if aply.stderr:
-            report["git_apply_stderr"] = aply.stderr[-4000:]
-        if aply.returncode != 0:
+    for bi, block in enumerate(blocks, start=1):
+        block_report: dict[str, Any] = {"index": bi, "ok": True}
+        if len(block.encode("utf-8", errors="ignore")) > MAX_PATCH_BYTES:
+            block_report.update({"ok": False, "reason": "patch_too_large"})
             report["ok"] = False
-            report["reason"] = "git_apply_failed"
-            (state_dir / f"patch_apply_round{round_n}.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
-            return 6
+            report["blocks"].append(block_report)
+            continue
 
-        if args.verify:
-            # Lightweight verification: ensure Python sources still parse.
-            ver = run([sys.executable, "-m", "compileall", "scripts", "mcp"], cwd=repo_root)
-            report["verify_rc"] = ver.returncode
-            if ver.stdout:
-                report["verify_stdout"] = ver.stdout[-4000:]
-            if ver.stderr:
-                report["verify_stderr"] = ver.stderr[-4000:]
-            if ver.returncode != 0:
+        touched = touched_files_from_patch(block)
+        block_report["touched_files"] = touched
+
+        if len(touched) > MAX_TOUCHED_FILES:
+            block_report.update({"ok": False, "reason": "too_many_files"})
+            report["ok"] = False
+            report["blocks"].append(block_report)
+            continue
+
+        blocked = [p for p in touched if is_blocked(p)]
+        if blocked:
+            block_report.update({"ok": False, "reason": "blocked_file_touched", "blocked": blocked[:50]})
+            report["ok"] = False
+            report["blocks"].append(block_report)
+            continue
+
+        if not allow_any:
+            disallowed = [p for p in touched if not any(_norm_path(p).startswith(pref) for pref in ALLOWED_PREFIXES)]
+            if disallowed:
+                block_report.update({"ok": False, "reason": "path_not_allowed", "disallowed": disallowed[:50]})
                 report["ok"] = False
-                report["reason"] = "verification_failed"
-                (state_dir / f"patch_apply_round{round_n}.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
-                return 7
+                report["blocks"].append(block_report)
+                continue
+
+        patch_path = state_dir / f"patch_round{round_n}_agent{agent_id}_block{bi}.diff"
+        patch_path.write_text(block.strip() + "\n", encoding="utf-8")
+
+        chk = run(["git", "apply", "--check", str(patch_path)], cwd=repo_root)
+        block_report["git_apply_check_rc"] = chk.returncode
+        if chk.returncode != 0:
+            # Salvage path for brand-new docs markdown only.
+            try:
+                if (
+                    len(touched) == 1
+                    and _is_new_file_patch(block, touched[0])
+                    and _salvage_new_file_markdown(block, repo_root=repo_root, path_rel=touched[0])
+                ):
+                    block_report["note"] = "salvaged_new_file_markdown"
+                    report["blocks"].append(block_report)
+                    continue
+            except Exception:
+                pass
+            block_report.update({"ok": False, "reason": "git_apply_check_failed", "stderr": (chk.stderr or "")[-2000:]})
+            report["ok"] = False
+            report["blocks"].append(block_report)
+            continue
+
+        if not args.dry_run:
+            aply = run(["git", "apply", "--whitespace=nowarn", str(patch_path)], cwd=repo_root)
+            block_report["git_apply_rc"] = aply.returncode
+            if aply.returncode != 0:
+                block_report.update({"ok": False, "reason": "git_apply_failed", "stderr": (aply.stderr or "")[-2000:]})
+                report["ok"] = False
+                report["blocks"].append(block_report)
+                continue
+
+            if args.verify:
+                ver = run([sys.executable, "-m", "compileall", "scripts", "mcp"], cwd=repo_root)
+                block_report["verify_rc"] = ver.returncode
+                if ver.returncode != 0:
+                    # Roll back this block.
+                    rb = run(["git", "apply", "-R", str(patch_path)], cwd=repo_root)
+                    block_report["rollback_rc"] = rb.returncode
+                    block_report.update({"ok": False, "reason": "verification_failed"})
+                    report["ok"] = False
+                    report["blocks"].append(block_report)
+                    continue
+
+        report["blocks"].append(block_report)
 
     (state_dir / f"patch_apply_round{round_n}.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
-    return 0
+    return 0 if report.get("ok") else 8
 
 
 if __name__ == "__main__":
