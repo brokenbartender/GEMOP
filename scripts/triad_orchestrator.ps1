@@ -115,15 +115,15 @@ function Ensure-Dir([string]$Path) {
   }
 }
 
-function Try-TaskKillTree([int]$Pid) {
-  if ($Pid -le 0) { return }
+function Try-TaskKillTree([int]$ProcId) {
+  if ($ProcId -le 0) { return }
   try {
     # /T: kill child processes, /F: force.
-    & taskkill.exe /PID $Pid /T /F 1>$null 2>$null
+    & taskkill.exe /PID $ProcId /T /F 1>$null 2>$null
   } catch { }
 }
 
-function Add-RunPidEntry([string]$RunDir, [int]$Pid, [int]$AgentId, [int]$RoundNumber, [string]$ScriptName, [string]$Kind) {
+function Add-RunPidEntry([string]$RunDir, [int]$ProcId, [int]$AgentId, [int]$RoundNumber, [string]$ScriptName, [string]$Kind) {
   try {
     $stateDir = Join-Path $RunDir "state"
     Ensure-Dir $stateDir
@@ -138,7 +138,7 @@ function Add-RunPidEntry([string]$RunDir, [int]$Pid, [int]$AgentId, [int]$RoundN
     $entries = @()
     try { $entries = @($obj.entries) } catch { $entries = @() }
     $entries = @($entries) + @([pscustomobject]@{
-      pid = $Pid
+      pid = $ProcId
       agent = $AgentId
       round = $RoundNumber
       script = $ScriptName
@@ -151,6 +151,190 @@ function Add-RunPidEntry([string]$RunDir, [int]$Pid, [int]$AgentId, [int]$RoundN
     }
     $out | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $p -Encoding UTF8
   } catch { }
+}
+
+function Acquire-StateLock([string]$RunDir, [string]$Name, [int]$TimeoutMs = 2000) {
+  $stateDir = Join-Path $RunDir "state"
+  Ensure-Dir $stateDir
+  $lockPath = Join-Path $stateDir ("{0}.lock" -f $Name)
+  $t0 = Get-Date
+  while (((Get-Date) - $t0).TotalMilliseconds -lt $TimeoutMs) {
+    try {
+      $fs = [System.IO.File]::Open($lockPath, [System.IO.FileMode]::CreateNew, [System.IO.FileAccess]::Write, [System.IO.FileShare]::None)
+      $sw = New-Object System.IO.StreamWriter($fs, [System.Text.Encoding]::UTF8)
+      $sw.WriteLine("pid={0}" -f $PID)
+      $sw.WriteLine("ts={0}" -f (Get-Date -Format o))
+      $sw.Flush()
+      return @{ ok=$true; path=$lockPath; stream=$sw; fs=$fs }
+    } catch {
+      Start-Sleep -Milliseconds 50
+    }
+  }
+  return @{ ok=$false; path=$lockPath }
+}
+
+function Release-StateLock($lockObj) {
+  try { if ($lockObj.stream) { $lockObj.stream.Dispose() } } catch { }
+  try { if ($lockObj.fs) { $lockObj.fs.Dispose() } } catch { }
+  try { if ($lockObj.path -and (Test-Path -LiteralPath $lockObj.path)) { Remove-Item -LiteralPath $lockObj.path -Force -ErrorAction SilentlyContinue } } catch { }
+}
+
+function ConvertTo-HashtableDeep($Value) {
+  if ($null -eq $Value) { return $null }
+
+  # Hashtable / IDictionary
+  if ($Value -is [System.Collections.IDictionary]) {
+    $h = @{}
+    foreach ($k in $Value.Keys) {
+      $h[$k] = ConvertTo-HashtableDeep -Value $Value[$k]
+    }
+    return $h
+  }
+
+  # Arrays / lists
+  if (($Value -is [System.Collections.IEnumerable]) -and -not ($Value -is [string])) {
+    $arr = @()
+    foreach ($v in $Value) {
+      $arr += ,(ConvertTo-HashtableDeep -Value $v)
+    }
+    return $arr
+  }
+
+  # PSCustomObject (ConvertFrom-Json default)
+  if ($Value -is [System.Management.Automation.PSCustomObject]) {
+    $h = @{}
+    foreach ($p in $Value.PSObject.Properties) {
+      $h[$p.Name] = ConvertTo-HashtableDeep -Value $p.Value
+    }
+    return $h
+  }
+
+  return $Value
+}
+
+function Read-RunLedger([string]$RunDir) {
+  $p = Join-Path $RunDir "state\\run.json"
+  $o = Read-JsonOrNull -Path $p
+  if (-not $o) { return $null }
+  return (ConvertTo-HashtableDeep -Value $o)
+}
+
+function Write-RunLedger([string]$RunDir, $Obj) {
+  $p = Join-Path $RunDir "state\\run.json"
+  Ensure-Dir (Split-Path -Parent $p)
+  try {
+    $Obj | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $p -Encoding UTF8
+  } catch { }
+}
+
+function Update-RunLedgerMeta {
+  param(
+    [string]$RunDir,
+    [hashtable]$Meta
+  )
+  $lk = Acquire-StateLock -RunDir $RunDir -Name "run_ledger" -TimeoutMs 2500
+  if (-not $lk.ok) { return }
+  try {
+    $obj = Read-RunLedger -RunDir $RunDir
+    if (-not $obj) { $obj = @{} }
+    foreach ($k in $Meta.Keys) { $obj[$k] = $Meta[$k] }
+    if (-not $obj.ContainsKey("state_version")) { $obj["state_version"] = 1 }
+    if (-not $obj.ContainsKey("rounds")) { $obj["rounds"] = @{} }
+    $obj["updated_at"] = (Get-Date -Format o)
+    Write-RunLedger -RunDir $RunDir -Obj $obj
+  } finally {
+    Release-StateLock $lk
+  }
+}
+
+function Update-RunLedgerRoundEvent {
+  param(
+    [string]$RunDir,
+    [int]$RoundNumber,
+    [string]$Event
+  )
+  $lk = Acquire-StateLock -RunDir $RunDir -Name "run_ledger" -TimeoutMs 2500
+  if (-not $lk.ok) { return }
+  try {
+    $obj = Read-RunLedger -RunDir $RunDir
+    if (-not $obj) { $obj = @{} }
+    if (-not $obj.ContainsKey("rounds")) { $obj["rounds"] = @{} }
+    $rkey = [string]([int]$RoundNumber)
+    if (-not $obj["rounds"].ContainsKey($rkey)) { $obj["rounds"][$rkey] = @{} }
+    $row = $obj["rounds"][$rkey]
+    if ($Event -eq "start") { $row["started_at"] = (Get-Date -Format o) }
+    if ($Event -eq "complete") { $row["completed_at"] = (Get-Date -Format o) }
+    if ($Event -eq "stopped") { $row["stopped_at"] = (Get-Date -Format o) }
+    $obj["rounds"][$rkey] = $row
+    $obj["updated_at"] = (Get-Date -Format o)
+    Write-RunLedger -RunDir $RunDir -Obj $obj
+  } finally {
+    Release-StateLock $lk
+  }
+}
+
+function Update-RunLedgerAgentSpawn {
+  param(
+    [string]$RunDir,
+    [int]$RoundNumber,
+    [int]$AgentId,
+    [int]$ProcId
+  )
+  $lk = Acquire-StateLock -RunDir $RunDir -Name "run_ledger" -TimeoutMs 2500
+  if (-not $lk.ok) { return }
+  try {
+    $obj = Read-RunLedger -RunDir $RunDir
+    if (-not $obj) { $obj = @{} }
+    if (-not $obj.ContainsKey("rounds")) { $obj["rounds"] = @{} }
+    $rkey = [string]([int]$RoundNumber)
+    if (-not $obj["rounds"].ContainsKey($rkey)) { $obj["rounds"][$rkey] = @{} }
+    $row = $obj["rounds"][$rkey]
+    if (-not $row.ContainsKey("agents")) { $row["agents"] = @{} }
+    $akey = [string]([int]$AgentId)
+    $row["agents"][$akey] = @{
+      status = "spawned"
+      pid = [int]$ProcId
+      started_at = (Get-Date -Format o)
+    }
+    $obj["rounds"][$rkey] = $row
+    $obj["updated_at"] = (Get-Date -Format o)
+    Write-RunLedger -RunDir $RunDir -Obj $obj
+  } finally {
+    Release-StateLock $lk
+  }
+}
+
+function Update-RunLedgerAgentStatus {
+  param(
+    [string]$RunDir,
+    [int]$RoundNumber,
+    [int]$AgentId,
+    [string]$Status,
+    [string]$Note = ""
+  )
+  $lk = Acquire-StateLock -RunDir $RunDir -Name "run_ledger" -TimeoutMs 2500
+  if (-not $lk.ok) { return }
+  try {
+    $obj = Read-RunLedger -RunDir $RunDir
+    if (-not $obj) { $obj = @{} }
+    if (-not $obj.ContainsKey("rounds")) { $obj["rounds"] = @{} }
+    $rkey = [string]([int]$RoundNumber)
+    if (-not $obj["rounds"].ContainsKey($rkey)) { $obj["rounds"][$rkey] = @{} }
+    $row = $obj["rounds"][$rkey]
+    if (-not $row.ContainsKey("agents")) { $row["agents"] = @{} }
+    $akey = [string]([int]$AgentId)
+    $cur = $row["agents"][$akey]
+    if (-not $cur) { $cur = @{} }
+    $cur["status"] = $Status
+    if ($Note) { $cur["note"] = $Note }
+    $cur["ended_at"] = (Get-Date -Format o)
+    $row["agents"][$akey] = $cur
+    $obj["rounds"][$rkey] = $row
+    $obj["updated_at"] = (Get-Date -Format o)
+    Write-RunLedger -RunDir $RunDir -Obj $obj
+  } finally {
+    Release-StateLock $lk
+  }
 }
 
 function Get-StopFiles([string]$RepoRoot, [string]$RunDir) {
@@ -646,6 +830,7 @@ function Ensure-RunnerScripts {
   if (-not (Test-Path -LiteralPath $runnerPy)) {
     throw "Missing agent runner: $runnerPy"
   }
+  $hostPy = Join-Path $RepoRoot "scripts\\agent_host.py"
 
   for ($i = 1; $i -le $AgentCount; $i++) {
     $promptPath = Join-Path $RunDir ("prompt{0}.txt" -f $i)
@@ -662,7 +847,11 @@ function Ensure-RunnerScripts {
 
     $script = @"
 `$ErrorActionPreference = 'Stop'
-python "$runnerPy" "$promptPath" "$roundOut" 1>> "$logOut" 2>> "$logErr"
+if (Test-Path -LiteralPath "$hostPy") {
+  python "$hostPy" "$runnerPy" "$promptPath" "$roundOut" 1>> "$logOut" 2>> "$logErr"
+} else {
+  python "$runnerPy" "$promptPath" "$roundOut" 1>> "$logOut" 2>> "$logErr"
+}
 Copy-Item -Force "$roundOut" "$finalOut"
 "@
     Set-Content -LiteralPath $ps1Path -Value $script -Encoding UTF8
@@ -703,20 +892,21 @@ function Ensure-AgentRoundOutputs {
     Write-OrchLog -RunDir $RunDir -Msg ("retry agent={0} round={1}" -f $i, $RoundNumber)
     try {
       $mock = ([string]$env:GEMINI_OP_MOCK_MODE).Trim().ToLower() -in @("1","true","yes")
-      if ($mock) {
+      $forceSub = ([string]$env:GEMINI_OP_FORCE_SUBPROCESS).Trim().ToLower() -in @("1","true","yes")
+      if ($mock -and -not $forceSub) {
         & $ps1 | Out-Null
       } else {
         $p = Start-Process -FilePath "powershell.exe" -ArgumentList @(
           "-NoProfile","-ExecutionPolicy","Bypass","-File", "`"$ps1`""
         ) -PassThru -WindowStyle Hidden
-        Add-RunPidEntry -RunDir $RunDir -Pid $p.Id -AgentId $i -RoundNumber $RoundNumber -ScriptName (Split-Path -Leaf $ps1) -Kind "retry_spawn"
+        Add-RunPidEntry -RunDir $RunDir -ProcId $p.Id -AgentId $i -RoundNumber $RoundNumber -ScriptName (Split-Path -Leaf $ps1) -Kind "retry_spawn"
 
         if ($retryTimeoutSec -gt 0) {
           Wait-Process -Id $p.Id -Timeout $retryTimeoutSec -ErrorAction SilentlyContinue | Out-Null
           $p.Refresh()
           if (-not $p.HasExited) {
             Write-OrchLog -RunDir $RunDir -Msg ("retry_timeout agent={0} round={1} pid={2} timeout_s={3}" -f $i, $RoundNumber, $p.Id, $retryTimeoutSec)
-            Try-TaskKillTree -Pid $p.Id
+            Try-TaskKillTree -ProcId $p.Id
             try { Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue } catch { }
 
             # Clear slot locks for this agent so subsequent agents don't deadlock.
@@ -726,7 +916,7 @@ function Ensure-AgentRoundOutputs {
                 Get-ChildItem -LiteralPath $slots -Filter "slot*.lock" -File -ErrorAction SilentlyContinue | ForEach-Object {
                   try {
                     $txt = Get-Content -LiteralPath $_.FullName -Raw -ErrorAction SilentlyContinue
-                    if ($txt -match "agent_id\\s*=\\s*$i(\\D|$)") { Remove-Item -LiteralPath $_.FullName -Force -ErrorAction SilentlyContinue }
+                    if ($txt -match "agent_id\s*=\s*$i(\D|$)") { Remove-Item -LiteralPath $_.FullName -Force -ErrorAction SilentlyContinue }
                   } catch { }
                 }
               }
@@ -758,10 +948,12 @@ function Invoke-RunAgents {
   }
 
   $mock = ([string]$env:GEMINI_OP_MOCK_MODE).Trim().ToLower() -in @("1","true","yes")
+  $forceSub = ([string]$env:GEMINI_OP_FORCE_SUBPROCESS).Trim().ToLower() -in @("1","true","yes")
+  try { Write-OrchLog -RunDir $RunDir -Msg ("invoke_run_agents round={0} resume={1} mock={2} force_subprocess={3} scripts={4}" -f $RoundNumber, [bool]$Resume, [bool]$mock, [bool]$forceSub, $scripts.Count) } catch { }
   if ($SkipAgentIds -and $SkipAgentIds.Count -gt 0) {
     $scripts = @(
       $scripts | Where-Object {
-        $m = [regex]::Match($_.Name, "run-agent(\\d+)\\.ps1")
+        $m = [regex]::Match($_.Name, "run-agent(\d+)\.ps1")
         if (-not $m.Success) { return $true }
         $id = [int]$m.Groups[1].Value
         return -not ($SkipAgentIds -contains $id)
@@ -770,11 +962,40 @@ function Invoke-RunAgents {
   }
 
   # Fast-path for deterministic mock runs: avoid spawning nested PowerShell processes.
-  if ($mock) {
+  if ($mock -and -not $forceSub) {
     foreach ($s in $scripts) {
       if (Test-StopRequested -RepoRoot $RepoRoot -RunDir $RunDir) {
         Write-OrchLog -RunDir $RunDir -Msg "stop_requested before_inprocess_exec"
         break
+      }
+
+      $agentId = 0
+      try {
+        if ($s.BaseName -match '^run-agent(\d+)$') { $agentId = [int]$Matches[1] }
+      } catch { $agentId = 0 }
+
+      if ($Resume -and $RoundNumber -gt 0 -and $agentId -gt 0) {
+        $shouldSkip = $false
+        $exists = $false
+        $matched = $false
+        $len = 0
+        $hasCompleted = $false
+        try {
+          $outPath = Join-Path $RunDir ("round{0}_agent{1}.md" -f $RoundNumber, $agentId)
+          $exists = (Test-Path -LiteralPath $outPath)
+          if ($exists) {
+            $txt = Read-Text $outPath
+            try { $len = [int]$txt.Length } catch { $len = 0 }
+            try { $hasCompleted = ($txt -like "*COMPLETED*") } catch { $hasCompleted = $false }
+            $matched = ($txt -and ($txt -match "(?m)^COMPLETED\s*$"))
+            if ($matched) { $shouldSkip = $true }
+          }
+        } catch { $shouldSkip = $false }
+        try { Write-OrchLog -RunDir $RunDir -Msg ("resume_check round={0} agent={1} exists={2} completed={3} has_completed_token={4} len={5} (mock)" -f $RoundNumber, $agentId, [bool]$exists, [bool]$matched, [bool]$hasCompleted, $len) } catch { }
+        if ($shouldSkip) {
+          try { Write-OrchLog -RunDir $RunDir -Msg ("resume_skip round={0} agent={1} reason=already_completed (mock)" -f $RoundNumber, $agentId) } catch { }
+          continue
+        }
       }
       try {
         & $s.FullName | Out-Null
@@ -796,7 +1017,7 @@ function Invoke-RunAgents {
       foreach ($l in $locks) {
         try {
           $txt = Get-Content -LiteralPath $l.FullName -Raw -ErrorAction SilentlyContinue
-          if ($txt -match "agent_id\\s*=\\s*$AgentId(\\D|$)") {
+          if ($txt -match "agent_id\s*=\s*$AgentId(\D|$)") {
             Remove-Item -LiteralPath $l.FullName -Force -ErrorAction SilentlyContinue
           }
         } catch { }
@@ -836,22 +1057,25 @@ function Invoke-RunAgents {
     } catch { $agentId = 0 }
 
     if ($Resume -and $RoundNumber -gt 0 -and $agentId -gt 0) {
+      $shouldSkip = $false
       try {
         $outPath = Join-Path $RunDir ("round{0}_agent{1}.md" -f $RoundNumber, $agentId)
         if (Test-Path -LiteralPath $outPath) {
           $txt = Read-Text $outPath
-          if ($txt -and ($txt -match "(?m)^COMPLETED\\s*$")) {
-            Write-OrchLog -RunDir $RunDir -Msg ("resume_skip round={0} agent={1} reason=already_completed" -f $RoundNumber, $agentId)
-            continue
-          }
+          if ($txt -and ($txt -match "(?m)^COMPLETED\s*$")) { $shouldSkip = $true }
         }
-      } catch { }
+      } catch { $shouldSkip = $false }
+      if ($shouldSkip) {
+        try { Write-OrchLog -RunDir $RunDir -Msg ("resume_skip round={0} agent={1} reason=already_completed" -f $RoundNumber, $agentId) } catch { }
+        continue
+      }
     }
 
     $p = Start-Process -FilePath "powershell.exe" -ArgumentList @(
       "-NoProfile","-ExecutionPolicy","Bypass","-File", "`"$($s.FullName)`""
     ) -PassThru -WindowStyle Hidden
-    Add-RunPidEntry -RunDir $RunDir -Pid $p.Id -AgentId $agentId -RoundNumber $RoundNumber -ScriptName $s.Name -Kind "spawn"
+    Add-RunPidEntry -RunDir $RunDir -ProcId $p.Id -AgentId $agentId -RoundNumber $RoundNumber -ScriptName $s.Name -Kind "spawn"
+    if ($RoundNumber -gt 0 -and $agentId -gt 0) { Update-RunLedgerAgentSpawn -RunDir $RunDir -RoundNumber $RoundNumber -AgentId $agentId -ProcId $p.Id }
 
     $running += [pscustomobject]@{ Proc=$p; Started=(Get-Date); Script=$s.Name; AgentId=$agentId }
     Write-Log "spawned $($s.Name) pid=$($p.Id)"
@@ -861,8 +1085,11 @@ function Invoke-RunAgents {
     if (Test-StopRequested -RepoRoot $RepoRoot -RunDir $RunDir) {
       Write-OrchLog -RunDir $RunDir -Msg "stop_requested killing_running_agents"
       foreach ($rp in $running) {
-        Try-TaskKillTree -Pid $rp.Proc.Id
+        Try-TaskKillTree -ProcId $rp.Proc.Id
         try { Stop-Process -Id $rp.Proc.Id -Force -ErrorAction SilentlyContinue } catch { }
+        try {
+          if ($RoundNumber -gt 0 -and $rp.AgentId -gt 0) { Update-RunLedgerAgentStatus -RunDir $RunDir -RoundNumber $RoundNumber -AgentId $rp.AgentId -Status "stopped" -Note "stop_requested" }
+        } catch { }
       }
       break
     }
@@ -874,11 +1101,12 @@ function Invoke-RunAgents {
           $age = ((Get-Date) - $e.Started).TotalSeconds
           if ($age -gt $AgentTimeoutSec) {
             Write-OrchLog -RunDir $RunDir -Msg ("agent_timeout script={0} pid={1} agent={2} age_s={3} timeout_s={4}" -f $e.Script, $e.Proc.Id, $e.AgentId, [int]$age, $AgentTimeoutSec)
-            Try-TaskKillTree -Pid $e.Proc.Id
+            Try-TaskKillTree -ProcId $e.Proc.Id
             try { Stop-Process -Id $e.Proc.Id -Force -ErrorAction SilentlyContinue } catch { }
             if ($e.AgentId -gt 0) {
               Try-KillPythonForAgent -RunDir $RunDir -AgentId $e.AgentId
               Try-ClearLocalSlotsForAgent -RunDir $RunDir -AgentId $e.AgentId
+              try { if ($RoundNumber -gt 0) { Update-RunLedgerAgentStatus -RunDir $RunDir -RoundNumber $RoundNumber -AgentId $e.AgentId -Status "timeout" -Note ("timeout_s={0}" -f $AgentTimeoutSec) } } catch { }
             }
           }
         } catch { }
@@ -888,6 +1116,23 @@ function Invoke-RunAgents {
     $running = @($running | Where-Object { -not $_.Proc.HasExited })
     Start-Sleep -Milliseconds 250
   }
+}
+
+function Compute-EffectiveMaxParallel {
+  param(
+    [int]$RequestedMaxParallel,
+    [switch]$Online,
+    [int]$CloudSeats,
+    [int]$MaxLocalConcurrency
+  )
+  $req = [Math]::Max(1, [int]$RequestedMaxParallel)
+  if (-not $Online) { return $req }
+  $cloud = [Math]::Max(0, [int]$CloudSeats)
+  $local = [Math]::Max(0, [int]$MaxLocalConcurrency)
+  # Backpressure: don't spawn more agent processes than we can realistically service
+  # with cloud seats + local slots. This prevents "everyone blocks then stampedes local".
+  $cap = [Math]::Max(1, ($cloud + $local))
+  return [Math]::Min($req, $cap)
 }
 
 function Write-LearningSummary {
@@ -946,6 +1191,21 @@ if ($EnableCouncilBus) { Ensure-Dir (Join-Path $RunDir "bus") }
 
 Ensure-MissionAnchor -RunDir $RunDir -Prompt $Prompt
 
+# Initialize run ledger (resumable state for dashboards/tools).
+try {
+  Update-RunLedgerMeta -RunDir $RunDir -Meta @{
+    run_dir = $RunDir
+    repo_root = $RepoRoot
+    created_at = (Get-Date -Format o)
+    pattern = $CouncilPattern
+    online = [bool]$Online
+    max_rounds = [int]$MaxRounds
+    requested_max_parallel = [int]$MaxParallel
+    cloud_seats = [int]$CloudSeats
+    max_local_concurrency = [int]$MaxLocalConcurrency
+  }
+} catch { }
+
 if (-not [string]::IsNullOrWhiteSpace($TenantId)) {
   $tenantPath = Join-Path $RunDir "state\\tenant.json"
   @{ tenant_id = $TenantId; created_at = (Get-Date -Format o) } | ConvertTo-Json | Set-Content -LiteralPath $tenantPath -Encoding UTF8
@@ -962,8 +1222,8 @@ $focusFile = Join-Path $RepoRoot "ramshare\\state\\project_focus.txt"
 Ensure-Dir (Split-Path -Parent $focusFile)
 (Split-Path -Leaf $RunDir) | Set-Content -LiteralPath $focusFile -Encoding UTF8
 
-Write-Log "triad_orchestrator repo=$RepoRoot run_dir=$RunDir pattern=$CouncilPattern max_parallel=$MaxParallel threshold=$Threshold"
-Write-OrchLog -RunDir $RunDir -Msg "start repo=$RepoRoot pattern=$CouncilPattern max_parallel=$MaxParallel threshold=$Threshold"
+Write-Log "triad_orchestrator repo=$RepoRoot run_dir=$RunDir pattern=$CouncilPattern max_parallel=$MaxParallel threshold=$Threshold resume=$Resume"
+Write-OrchLog -RunDir $RunDir -Msg "start repo=$RepoRoot pattern=$CouncilPattern max_parallel=$MaxParallel threshold=$Threshold resume=$Resume"
 
 $skipAgentIds = Parse-AgentIdList $SkipAgents
 $adversaryIds = Parse-AgentIdList $Adversaries
@@ -1012,6 +1272,7 @@ if ($existingRunnerScripts -and $existingRunnerScripts.Count -gt 0) {
   $agentCount = $existingRunnerScripts.Count
   Write-Log "using existing run-agent scripts (count=$agentCount)"
   $env:GEMINI_OP_AGENT_COUNT = "$agentCount"
+  try { Update-RunLedgerMeta -RunDir $RunDir -Meta @{ agent_count = [int]$agentCount } } catch { }
 
   # Safety: bound concurrent local calls (prevents overload if many seats fall back to local).
   $mlc = [Math]::Max(0, [int]$MaxLocalConcurrency)
@@ -1037,6 +1298,7 @@ if ($existingRunnerScripts -and $existingRunnerScripts.Count -gt 0) {
   }
   $agentCount = [Math]::Max(1, $teamList.Count)
   $env:GEMINI_OP_AGENT_COUNT = "$agentCount"
+  try { Update-RunLedgerMeta -RunDir $RunDir -Meta @{ agent_count = [int]$agentCount } } catch { }
 
   # Safety: bound concurrent local calls (prevents overload if many seats fall back to local).
   $mlc = [Math]::Max(0, [int]$MaxLocalConcurrency)
@@ -1090,16 +1352,36 @@ if ($existingRunnerScripts -and $existingRunnerScripts.Count -gt 0) {
     Generate-RunScaffold -RepoRoot $RepoRoot -RunDir $RunDir -Prompt $Prompt -TeamCsv $Team -Agents $Agents -CouncilPattern $CouncilPattern -InjectLearningHints:$InjectLearningHints -InjectCapabilityContract:$InjectCapabilityContract -AdversaryIds $adversaryIds -AdversaryMode $AdversaryMode -PoisonPath $PoisonPath -PoisonAgent $PoisonAgent -Ontology $Ontology -OntologyOverrideAgent $OntologyOverrideAgent -OntologyOverride $OntologyOverride -MisinformAgent $MisinformAgent -MisinformText $MisinformText -RoundNumber $r
     Ensure-RunnerScripts -RepoRoot $RepoRoot -RunDir $RunDir -RoundNumber $r -AgentCount $agentCount
 
+    try { Update-RunLedgerRoundEvent -RunDir $RunDir -RoundNumber $r -Event "start" } catch { }
     Write-Log "round $r starting"
     Write-OrchLog -RunDir $RunDir -Msg "round_start round=$r"
-    Invoke-RunAgents -RunDir $RunDir -MaxParallel $MaxParallel -SkipAgentIds $skipAgentIds -AgentTimeoutSec $AgentTimeoutSec -RoundNumber $r -Resume:$Resume
+    $effMax = Compute-EffectiveMaxParallel -RequestedMaxParallel $MaxParallel -Online:$Online -CloudSeats $CloudSeats -MaxLocalConcurrency $MaxLocalConcurrency
+    if ($effMax -ne $MaxParallel) {
+      Write-OrchLog -RunDir $RunDir -Msg ("scheduler_backpressure requested_max_parallel={0} effective_max_parallel={1} cloud_seats={2} max_local_concurrency={3}" -f $MaxParallel, $effMax, $CloudSeats, $MaxLocalConcurrency)
+    }
+    Invoke-RunAgents -RunDir $RunDir -MaxParallel $effMax -SkipAgentIds $skipAgentIds -AgentTimeoutSec $AgentTimeoutSec -RoundNumber $r -Resume:$Resume
     if (-not (Test-StopRequested -RepoRoot $RepoRoot -RunDir $RunDir)) {
       Ensure-AgentRoundOutputs -RunDir $RunDir -RoundNumber $r -AgentCount $agentCount -SkipAgentIds $skipAgentIds -AgentTimeoutSec $AgentTimeoutSec
     } else {
       Write-OrchLog -RunDir $RunDir -Msg ("stop_requested skip_retry round={0}" -f $r)
+      try { Update-RunLedgerRoundEvent -RunDir $RunDir -RoundNumber $r -Event "stopped" } catch { }
     }
+
+    # Mark round agent completion best-effort by output contract marker.
+    try {
+      for ($ai = 1; $ai -le $agentCount; $ai++) {
+        if ($skipAgentIds -and ($skipAgentIds -contains $ai)) { continue }
+        $op = Join-Path $RunDir ("round{0}_agent{1}.md" -f $r, $ai)
+        if (-not (Test-Path -LiteralPath $op)) { continue }
+        $txt = Read-Text $op
+        if ($txt -and ($txt -match "(?m)^COMPLETED\s*$")) {
+          Update-RunLedgerAgentStatus -RunDir $RunDir -RoundNumber $r -AgentId $ai -Status "completed"
+        }
+      }
+    } catch { }
     Write-Log "round $r complete"
     Write-OrchLog -RunDir $RunDir -Msg "round_complete round=$r"
+    try { Update-RunLedgerRoundEvent -RunDir $RunDir -RoundNumber $r -Event "complete" } catch { }
 
     if ($ExtractDecisions -or $RequireDecisionJson) {
       try {
@@ -1182,7 +1464,16 @@ if ($existingRunnerScripts -and $existingRunnerScripts.Count -gt 0) {
     # Optional: auto-apply diffs produced by the highest-integrity agent in implementation rounds.
     if ($AutoApplyPatches -and $r -ge 2) {
       try {
-        & python (Join-Path $RepoRoot "scripts\\council_patch_apply.py") --repo-root $RepoRoot --run-dir $RunDir --round $r --verify | Out-Null
+        # Ensure decisions exist for the chosen agent so patch-apply can enforce declared touched files.
+        try {
+          $ed = Join-Path $RepoRoot "scripts\\extract_agent_decisions.py"
+          if (Test-Path -LiteralPath $ed) {
+            & python $ed --run-dir $RunDir --round $r --agent-count $agentCount | Out-Null
+            Write-OrchLog -RunDir $RunDir -Msg ("decisions_extracted_for_autopatch round={0}" -f $r)
+          }
+        } catch { }
+
+        & python (Join-Path $RepoRoot "scripts\\council_patch_apply.py") --repo-root $RepoRoot --run-dir $RunDir --round $r --require-decision-files --verify | Out-Null
         Write-OrchLog -RunDir $RunDir -Msg ("auto_apply_patches round={0} ok" -f $r)
       } catch {
         Write-OrchLog -RunDir $RunDir -Msg ("auto_apply_patches_failed round={0} error={1}" -f $r, $_.Exception.Message)
@@ -1225,7 +1516,11 @@ if ($EnableCouncilBus) {
 }
 
 if ($existingRunnerScripts -and $existingRunnerScripts.Count -gt 0) {
-  Invoke-RunAgents -RunDir $RunDir -MaxParallel $MaxParallel -SkipAgentIds $skipAgentIds -AgentTimeoutSec $AgentTimeoutSec -RoundNumber 1 -Resume:$Resume
+  $effMax = Compute-EffectiveMaxParallel -RequestedMaxParallel $MaxParallel -Online:$Online -CloudSeats $CloudSeats -MaxLocalConcurrency $MaxLocalConcurrency
+  if ($effMax -ne $MaxParallel) {
+    Write-OrchLog -RunDir $RunDir -Msg ("scheduler_backpressure requested_max_parallel={0} effective_max_parallel={1} cloud_seats={2} max_local_concurrency={3}" -f $MaxParallel, $effMax, $CloudSeats, $MaxLocalConcurrency)
+  }
+  Invoke-RunAgents -RunDir $RunDir -MaxParallel $effMax -SkipAgentIds $skipAgentIds -AgentTimeoutSec $AgentTimeoutSec -RoundNumber 1 -Resume:$Resume
   if ($supervisorOn) {
     try {
       $supArgs = @("--run-dir",$RunDir,"--round",1,"--agent-count",$agentCount,"--repo-root",$RepoRoot)

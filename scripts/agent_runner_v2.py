@@ -13,6 +13,7 @@ import urllib.error
 # Local helper: resolves repo root via env var or file location.
 from repo_paths import get_repo_root
 from provider_router import CircuitBreaker, ProviderRouter, ProviderSpec
+from system_metrics import low_memory
 
 # Fast-path for deterministic redteam runs: avoid heavy imports per process.
 MOCK_MODE = (os.environ.get("GEMINI_OP_MOCK_MODE") or "").strip().lower() in ("1", "true", "yes")
@@ -278,6 +279,15 @@ def _render_mock_output(prompt: str, *, agent_id: int, round_n: int, behavior: d
         lines.append("I cannot proceed with this task. (Simulated refusal for resilience testing.)")
     elif beh == "noise":
         lines.append("Simulated noisy output: " + ("lorem " * 250).strip())
+    elif beh == "sleep":
+        try:
+            s = float((behavior or {}).get("sleep_s") or 0)
+        except Exception:
+            s = 0.0
+        s = max(0.0, min(3600.0, s))
+        if s > 0:
+            time.sleep(s)
+        lines.append(f"Simulated delay complete: slept_s={s}")
     elif beh == "subtle_wrong":
         lines.append("Repo fact (subtly wrong): configs are stored in scripts/configs.toml (verify).")
         lines.append("Referenced file: scripts/does_not_exist.py")
@@ -981,6 +991,27 @@ def run_agent(prompt_path, out_md, fallback_model=None):
             if _is_stopped(REPO_ROOT, run_dir):
                 log("STOP requested before local call; aborting.")
                 sys.exit(2)
+            # Resource-aware throttle: fail closed on low system memory rather than OOM'ing the host.
+            try:
+                is_low, info = low_memory()
+                if is_low:
+                    log(f"LOCAL_GUARD: low_memory avail_mb={info.get('avail_mb')} min_free_mb={info.get('min_free_mb')}")
+                    return (
+                        "LOCAL_OVERLOAD: Low free memory detected; refusing local inference to protect the host.\n"
+                        f"- agent_id: {agent_id}\n"
+                        f"- avail_mb: {info.get('avail_mb')}\n"
+                        f"- min_free_mb: {info.get('min_free_mb')}\n"
+                        "\n"
+                        "Remediations:\n"
+                        "- Close memory-heavy apps, then re-run.\n"
+                        "- Reduce Agents/MaxParallel.\n"
+                        "- Keep CloudSeats > 0 when -Online.\n"
+                        "- Lower GEMINI_OP_MIN_FREE_MEM_MB only if you accept crash risk.\n"
+                        "\n"
+                        "COMPLETED\n"
+                    )
+            except Exception:
+                pass
             slot_t0 = time.time()
             slot = _acquire_local_slot(REPO_ROOT, run_dir, agent_id)
             slot_wait_s = round(time.time() - slot_t0, 3)
@@ -1031,15 +1062,26 @@ def run_agent(prompt_path, out_md, fallback_model=None):
             )
 
             providers: list[ProviderSpec] = []
+
+            def cloud_call() -> str:
+                nonlocal selected_backend, selected_model
+                selected_backend = "gemini_cloud"
+                selected_model = "gemini-2.5-flash"
+                if _is_stopped(REPO_ROOT, run_dir):
+                    log("STOP requested before cloud call; aborting.")
+                    sys.exit(2)
+                txt = call_gemini_cloud_modern(prompt)
+                if not txt or not str(txt).strip():
+                    raise RuntimeError("empty_cloud_response")
+                return str(txt)
+
             if tier == "cloud":
                 if _cloud_allowed_for(agent_id) and check_internet():
-                    selected_backend = "gemini_cloud"
-                    selected_model = "gemini-2.5-flash"
                     providers.append(
                         ProviderSpec(
                             name="cloud_gemini",
                             model="gemini-2.5-flash",
-                            call=lambda: call_gemini_cloud_modern(prompt),
+                            call=cloud_call,
                             retries=_read_int_env("GEMINI_OP_CLOUD_RETRIES", 1),
                         )
                     )

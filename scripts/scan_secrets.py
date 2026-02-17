@@ -128,12 +128,31 @@ def scan_diff(repo_root: Path, *, staged: bool) -> dict[str, Any]:
     return scan_text(p.stdout or "")
 
 
+def scan_diff_range(repo_root: Path, rev_range: str) -> dict[str, Any]:
+    rr = (rev_range or "").strip()
+    if not rr:
+        return {"secret_patterns": []}
+    p = run(["git", "diff", rr], cwd=repo_root)
+    return scan_text(p.stdout or "")
+
+
+def upstream_rev(repo_root: Path) -> str:
+    try:
+        p = run(["git", "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"], cwd=repo_root)
+        s = (p.stdout or "").strip()
+        return s
+    except Exception:
+        return ""
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="Scan for likely secrets (fail closed by default).")
     ap.add_argument("--repo-root", default="", help="Repo root (defaults to GEMINI_OP_REPO_ROOT or scripts/..)")
     ap.add_argument("--staged", action="store_true", help="Scan staged file contents from the git index.")
     ap.add_argument("--diff", action="store_true", help="Scan git diff output (useful after auto-apply).")
     ap.add_argument("--diff-staged", action="store_true", help="Scan staged git diff output.")
+    ap.add_argument("--diff-range", default="", help="Scan git diff over a rev range (e.g., origin/main..HEAD).")
+    ap.add_argument("--against-upstream", action="store_true", help="Scan git diff from upstream to HEAD (best-effort).")
     ap.add_argument("--paths", nargs="*", default=[], help="Paths to scan from the working tree.")
     ap.add_argument("--format", choices=("json", "text"), default="json")
     args = ap.parse_args()
@@ -154,6 +173,21 @@ def main() -> int:
         res = scan_diff(repo_root, staged=True)
         hits.update(res["secret_patterns"])
         files_scanned.append("git diff --cached")
+
+    if args.diff_range:
+        res = scan_diff_range(repo_root, args.diff_range)
+        hits.update(res["secret_patterns"])
+        files_scanned.append(f"git diff {args.diff_range}")
+
+    if args.against_upstream:
+        up = upstream_rev(repo_root)
+        if up:
+            rr = f"{up}..HEAD"
+            res = scan_diff_range(repo_root, rr)
+            hits.update(res["secret_patterns"])
+            files_scanned.append(f"git diff {rr}")
+        else:
+            files_scanned.append("upstream: none")
 
     if args.paths:
         f2, res2 = scan_paths(repo_root, args.paths)

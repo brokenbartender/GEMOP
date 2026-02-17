@@ -17,6 +17,6 @@ esac
 # Best-effort: scan staged state as a last check. (Pre-push cannot easily reconstruct
 # the exact push range portably; this is still better than nothing.)
 python scripts/scan_risk.py --staged >/dev/null || true
-python scripts/scan_secrets.py --staged >/dev/null || true
+python scripts/scan_secrets.py --against-upstream >/dev/null 2>&1 || python scripts/scan_secrets.py --staged >/dev/null || true
 
 exit 0

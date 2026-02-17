@@ -7,8 +7,10 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-$repoRoot = 'C:\Gemini'
+$repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $venvPy = Join-Path $repoRoot '.venv\Scripts\python.exe'
+$python = 'python'
+if (Test-Path $venvPy) { $python = $venvPy }
 $caller = Join-Path $repoRoot 'mcp-daemons\mcp-call.mjs'
 $startDaemonsScript = Join-Path $repoRoot 'start-daemons.ps1'
 
@@ -19,6 +21,10 @@ function Fail($msg) {
 
 function Ok($msg) {
   Write-Host ("OK:   {0}" -f $msg) -ForegroundColor Green
+}
+
+function Warn($msg) {
+  Write-Host ("WARN: {0}" -f $msg) -ForegroundColor Yellow
 }
 
 function Cleanup-StaleLockFiles {
@@ -86,11 +92,26 @@ Write-Host "Health check (profile=$Profile)"
 Cleanup-StaleLockFiles
 
 # Basic dependencies
-if (Test-Path $venvPy) { Ok "Python venv present ($venvPy)" } else { Fail "Missing Python venv ($venvPy)" }
+try { $null = (Get-Command $python -ErrorAction Stop); Ok "python is available ($python)" } catch { Fail "python not found in PATH and no .venv detected" }
 try { $null = (Get-Command node -ErrorAction Stop); Ok "node is available" } catch { Fail "node not found in PATH" }
 try { $null = (Get-Command rg -ErrorAction Stop); Ok "rg (ripgrep) is available" } catch { Fail "rg not found in PATH (optional but recommended)" }
 try { $null = (Get-Command git -ErrorAction Stop); Ok "git is available" } catch { Fail "git not found in PATH" }
 if (Test-Path $caller) { Ok "MCP caller present ($caller)" } else { Fail "Missing MCP caller ($caller)" }
+
+# Local model backend (Ollama) is optional, but council local runs depend on it.
+try {
+  $ollamaOk = $false
+  try {
+    $resp = Invoke-WebRequest -UseBasicParsing -Uri 'http://127.0.0.1:11434/api/tags' -TimeoutSec 2
+    if ($resp.StatusCode -ge 200 -and $resp.StatusCode -lt 500) { $ollamaOk = $true }
+  } catch { $ollamaOk = $false }
+  $requireOllama = (($env:GEMINI_OP_HEALTH_REQUIRE_OLLAMA) -or '').Trim().ToLower() -in @('1','true','yes')
+  if ($ollamaOk) {
+    Ok "Ollama reachable (http://127.0.0.1:11434)"
+  } else {
+    if ($requireOllama) { Fail "Ollama not reachable (start Ollama if you want local model runs)" } else { Warn "Ollama not reachable (local model runs will fail/fallback)" }
+  }
+} catch { }
 
 # Expected daemons by profile
 $daemonChecks = New-Object System.Collections.Generic.List[object]

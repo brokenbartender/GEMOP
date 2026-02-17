@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import ipaddress
 import re
 import time
 import urllib.error
@@ -59,6 +60,32 @@ def domain_allowed(host: str, allow: list[str], deny: list[str]) -> tuple[bool, 
             return True, ""
 
     return False, "not in allowlist"
+
+
+def host_is_private_or_local(host: str) -> tuple[bool, str]:
+    h = (host or "").lower().strip(".")
+    if not h:
+        return True, "missing hostname"
+    if h in ("localhost",):
+        return True, "localhost blocked"
+    if h.endswith(".local"):
+        return True, ".local blocked"
+    # Block direct IPs that are private, loopback, link-local, etc. (SSRF guardrail)
+    try:
+        ip = ipaddress.ip_address(h)
+        if ip.is_private:
+            return True, "private ip blocked"
+        if ip.is_loopback:
+            return True, "loopback ip blocked"
+        if ip.is_link_local:
+            return True, "link-local ip blocked"
+        if ip.is_multicast:
+            return True, "multicast ip blocked"
+        if ip.is_reserved:
+            return True, "reserved ip blocked"
+    except Exception:
+        pass
+    return False, ""
 
 
 def fetch(url: str, *, timeout_s: int, max_bytes: int) -> dict[str, Any]:
@@ -179,11 +206,15 @@ def main() -> int:
         if sch not in ("http", "https"):
             r = {"ok": False, "url": url, "status": 0, "error": f"disallowed scheme: {sch or 'unknown'}", "duration_s": 0.0}
         else:
-            okd, why = domain_allowed(host, allow=allow, deny=deny)
-            if not okd:
-                r = {"ok": False, "url": url, "status": 0, "error": f"blocked url ({host}): {why}", "duration_s": 0.0}
+            priv, why_priv = host_is_private_or_local(host)
+            if priv:
+                r = {"ok": False, "url": url, "status": 0, "error": f"blocked url ({host}): {why_priv}", "duration_s": 0.0}
             else:
-                r = fetch(url, timeout_s=int(args.timeout_s), max_bytes=int(args.max_bytes))
+                okd, why = domain_allowed(host, allow=allow, deny=deny)
+                if not okd:
+                    r = {"ok": False, "url": url, "status": 0, "error": f"blocked url ({host}): {why}", "duration_s": 0.0}
+                else:
+                    r = fetch(url, timeout_s=int(args.timeout_s), max_bytes=int(args.max_bytes))
         body = r.pop("body_bytes", b"") if isinstance(r, dict) else b""
         if r.get("ok") and body:
             slug = safe_slug(url)

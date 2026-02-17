@@ -38,6 +38,10 @@ config.toml
 config.local.toml
 gemini.log
 .DS_Store
+
+# Local debug run artifacts (kept out of git)
+tmp_run_*/
+tmp_run_timeout_*/
 .env
 .env.*
 .idea/

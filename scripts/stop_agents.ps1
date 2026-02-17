@@ -66,10 +66,10 @@ try {
 } catch { }
 
 # PID-targeted kill (preferred): kill known agent process trees recorded by orchestrator.
-function Try-TaskKillTree([int]$Pid) {
-  if ($Pid -le 0 -or $Pid -eq $PID) { return }
-  try { & taskkill.exe /PID $Pid /T /F 1>$null 2>$null } catch { }
-  try { Stop-Process -Id $Pid -Force -ErrorAction SilentlyContinue } catch { }
+function Try-TaskKillTree([int]$ProcId) {
+  if ($ProcId -le 0 -or $ProcId -eq $PID) { return }
+  try { & taskkill.exe /PID $ProcId /T /F 1>$null 2>$null } catch { }
+  try { Stop-Process -Id $ProcId -Force -ErrorAction SilentlyContinue } catch { }
 }
 
 try {
@@ -84,7 +84,7 @@ try {
         if (-not $raw) { continue }
         $obj = $raw | ConvertFrom-Json
         foreach ($e in @($obj.entries)) {
-          try { Try-TaskKillTree -Pid ([int]$e.pid) } catch { }
+          try { Try-TaskKillTree -ProcId ([int]$e.pid) } catch { }
         }
       } catch { }
     }

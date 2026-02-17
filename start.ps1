@@ -30,6 +30,7 @@ param(
   [switch]$SaveTokens,
   [switch]$Dashboard,
   [switch]$SkipDocCheck,
+  [switch]$SkipPreflight,
   [string]$Prompt
 )
 
@@ -99,6 +100,20 @@ try {
 if (Test-Path ".\start-daemons.ps1") {
     Write-Host "[Init] Starting Daemons..." -ForegroundColor Green
     & .\start-daemons.ps1 -Profile $Profile *>> $log
+}
+
+# 2b. Preflight health checks (fail-fast on missing deps). Skip with -SkipPreflight.
+if (-not $SkipPreflight) {
+    try {
+        $health = Join-Path $RepoRoot "scripts\\health.ps1"
+        if (Test-Path -LiteralPath $health) {
+            if ($Online) { $env:GEMINI_OP_HEALTH_REQUIRE_OLLAMA = "" } else { $env:GEMINI_OP_HEALTH_REQUIRE_OLLAMA = "1" }
+            & powershell -NoProfile -ExecutionPolicy Bypass -File $health -Profile $Profile | Out-Null
+        }
+    } catch {
+        Write-Error ("[Preflight] Failed: {0}. Re-run with -SkipPreflight to bypass." -f $_.Exception.Message)
+        exit 1
+    }
 }
 
 # 3. Model & Mode Selection

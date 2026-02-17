@@ -150,6 +150,23 @@ def read_json(path: Path) -> Any:
         return None
 
 
+def load_decision(run_dir: Path, round_n: int, agent_id: int) -> dict[str, Any] | None:
+    p = run_dir / "state" / "decisions" / f"round{int(round_n)}_agent{int(agent_id)}.json"
+    obj = read_json(p)
+    return obj if isinstance(obj, dict) else None
+
+
+def _norm_list(xs: list[str]) -> list[str]:
+    out: list[str] = []
+    seen: set[str] = set()
+    for x in xs or []:
+        p = _norm_path(str(x))
+        if p and p not in seen:
+            seen.add(p)
+            out.append(p)
+    return out
+
+
 def choose_agent_from_supervisor(run_dir: Path, round_n: int) -> int:
     sup = run_dir / "state" / f"supervisor_round{round_n}.json"
     obj = read_json(sup)
@@ -189,6 +206,7 @@ def main() -> int:
     ap.add_argument("--agent", type=int, default=0, help="Agent id (1-based). If omitted, choose best from supervisor.")
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--verify", action="store_true", help="Run lightweight verification after apply.")
+    ap.add_argument("--require-decision-files", action="store_true", help="Fail if DECISION_JSON files list is missing or does not cover touched files.")
     args = ap.parse_args()
 
     repo_root = Path(args.repo_root).resolve()
@@ -209,6 +227,8 @@ def main() -> int:
         return 2
 
     out_path, out_txt = load_agent_output(run_dir, round_n, agent_id)
+    decision = load_decision(run_dir, round_n, agent_id)
+    decision_files = _norm_list(list((decision or {}).get("files") or []))
 
     # Reuse supervisor guardrail weakening scan (do not auto-apply shadow code).
     try:
@@ -249,6 +269,12 @@ def main() -> int:
         "dry_run": bool(args.dry_run),
         "ts": time.time(),
     }
+    if decision is not None:
+        report["decision_path"] = str(run_dir / "state" / "decisions" / f"round{round_n}_agent{agent_id}.json")
+        report["decision_files"] = decision_files
+    else:
+        report["decision_path"] = ""
+        report["decision_files"] = []
 
     if not blocks:
         report["ok"] = True
@@ -279,15 +305,29 @@ def main() -> int:
             continue
 
         touched = touched_files_from_patch(block)
-        block_report["touched_files"] = touched
+        touched_norm = _norm_list(touched)
+        block_report["touched_files"] = touched_norm
 
-        if len(touched) > MAX_TOUCHED_FILES:
+        if args.require_decision_files:
+            if decision is None or not decision_files:
+                block_report.update({"ok": False, "reason": "missing_decision_files"})
+                report["ok"] = False
+                report["blocks"].append(block_report)
+                continue
+            missing = [p for p in touched_norm if p not in set(decision_files)]
+            if missing:
+                block_report.update({"ok": False, "reason": "touched_files_not_declared_in_decision", "missing": missing[:50]})
+                report["ok"] = False
+                report["blocks"].append(block_report)
+                continue
+
+        if len(touched_norm) > MAX_TOUCHED_FILES:
             block_report.update({"ok": False, "reason": "too_many_files"})
             report["ok"] = False
             report["blocks"].append(block_report)
             continue
 
-        blocked = [p for p in touched if is_blocked(p)]
+        blocked = [p for p in touched_norm if is_blocked(p)]
         if blocked:
             block_report.update({"ok": False, "reason": "blocked_file_touched", "blocked": blocked[:50]})
             report["ok"] = False
@@ -295,7 +335,7 @@ def main() -> int:
             continue
 
         if not allow_any:
-            disallowed = [p for p in touched if not any(_norm_path(p).startswith(pref) for pref in ALLOWED_PREFIXES)]
+            disallowed = [p for p in touched_norm if not any(_norm_path(p).startswith(pref) for pref in ALLOWED_PREFIXES)]
             if disallowed:
                 block_report.update({"ok": False, "reason": "path_not_allowed", "disallowed": disallowed[:50]})
                 report["ok"] = False
@@ -311,9 +351,9 @@ def main() -> int:
             # Salvage path for brand-new docs markdown only.
             try:
                 if (
-                    len(touched) == 1
-                    and _is_new_file_patch(block, touched[0])
-                    and _salvage_new_file_markdown(block, repo_root=repo_root, path_rel=touched[0])
+                    len(touched_norm) == 1
+                    and _is_new_file_patch(block, touched_norm[0])
+                    and _salvage_new_file_markdown(block, repo_root=repo_root, path_rel=touched_norm[0])
                 ):
                     block_report["note"] = "salvaged_new_file_markdown"
                     report["blocks"].append(block_report)
