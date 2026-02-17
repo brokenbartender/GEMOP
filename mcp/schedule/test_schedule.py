@@ -5,6 +5,7 @@ import functools
 from unittest import mock, TestCase
 import os
 import time
+import pytest
 
 # Silence "missing docstring", "method could be a function",
 # "class already defined", and "too many public methods" messages:
@@ -27,7 +28,10 @@ TZ_UTC = "UTC0"
 
 # Set timezone to Europe/Berlin (CEST) to ensure global reproducibility
 os.environ["TZ"] = TZ_BERLIN
-time.tzset()
+if hasattr(time, "tzset"):
+    time.tzset()
+else:
+    pytest.skip("time.tzset() is not available on this platform", allow_module_level=True)
 
 
 def make_mock_job(name=None):

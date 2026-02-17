@@ -1239,6 +1239,21 @@ function Compute-EffectiveMaxParallel {
   return [Math]::Min($req, $cap)
 }
 
+function Invoke-NativeStrict {
+  param(
+    [Parameter(Mandatory=$true)][string]$Exe,
+    [Parameter(Mandatory=$false)][object[]]$Args = @(),
+    [Parameter(Mandatory=$false)][string]$Context = ""
+  )
+  $out = & $Exe @Args
+  $rc = $LASTEXITCODE
+  if ($rc -ne 0) {
+    $ctx = if ([string]::IsNullOrWhiteSpace($Context)) { "" } else { " context=$Context" }
+    throw ("Native command failed rc={0}{1} exe={2}" -f $rc, $ctx, $Exe)
+  }
+  return $out
+}
+
 function Write-LearningSummary {
   param(
     [string]$RepoRoot,
@@ -1275,8 +1290,15 @@ if (-not [string]::IsNullOrWhiteSpace($Ontology)) { $env:GEMINI_OP_ONTOLOGY_PRES
 # Cloud routing is opt-in: allow cloud only when -Online is passed.
 if ($Online) {
   $env:GEMINI_OP_ALLOW_CLOUD = "1"
+  # Hybrid guardrails:
+  # - Allow cloud spillover for non-cloud seats when local is unhealthy (agent_runner_v2 enforces budgets).
+  # - Treat local overload as a provider failure so spillover can trigger instead of returning junk output.
+  if ([string]::IsNullOrWhiteSpace($env:GEMINI_OP_CLOUD_SPILLOVER)) { $env:GEMINI_OP_CLOUD_SPILLOVER = "1" }
+  if ([string]::IsNullOrWhiteSpace($env:GEMINI_OP_LOCAL_OVERLOAD_RAISE)) { $env:GEMINI_OP_LOCAL_OVERLOAD_RAISE = "1" }
 } else {
   $env:GEMINI_OP_ALLOW_CLOUD = ""
+  $env:GEMINI_OP_CLOUD_SPILLOVER = ""
+  $env:GEMINI_OP_LOCAL_OVERLOAD_RAISE = ""
 }
 
 # Default local model for council runs (can be overridden by user env).
@@ -1507,7 +1529,8 @@ if ($existingRunnerScripts -and $existingRunnerScripts.Count -gt 0) {
         if (Test-Path -LiteralPath $ed) {
           $ea = @("--run-dir",$RunDir,"--round",$r,"--agent-count",$agentCount)
           if ($RequireDecisionJson) { $ea += "--require" }
-          & python $ed @ea | Out-Null
+          $edArgs = @($ed) + @($ea)
+          Invoke-NativeStrict -Exe "python" -Args $edArgs -Context ("extract_agent_decisions round={0}" -f $r) | Out-Null
           Write-OrchLog -RunDir $RunDir -Msg ("decisions_extracted round={0}" -f $r)
         }
       } catch {
@@ -1586,15 +1609,17 @@ if ($existingRunnerScripts -and $existingRunnerScripts.Count -gt 0) {
         try {
           $ed = Join-Path $RepoRoot "scripts\\extract_agent_decisions.py"
           if (Test-Path -LiteralPath $ed) {
-            & python $ed --run-dir $RunDir --round $r --agent-count $agentCount | Out-Null
+            Invoke-NativeStrict -Exe "python" -Args @($ed,"--run-dir",$RunDir,"--round",$r,"--agent-count",$agentCount) -Context ("extract_agent_decisions_for_autopatch round={0}" -f $r) | Out-Null
             Write-OrchLog -RunDir $RunDir -Msg ("decisions_extracted_for_autopatch round={0}" -f $r)
           }
         } catch { }
 
-        & python (Join-Path $RepoRoot "scripts\\council_patch_apply.py") --repo-root $RepoRoot --run-dir $RunDir --round $r --require-decision-files --verify | Out-Null
+        $cpa = Join-Path $RepoRoot "scripts\\council_patch_apply.py"
+        Invoke-NativeStrict -Exe "python" -Args @($cpa,"--repo-root",$RepoRoot,"--run-dir",$RunDir,"--round",$r,"--require-decision-files","--require-diff-blocks","--verify") -Context ("council_patch_apply round={0}" -f $r) | Out-Null
         Write-OrchLog -RunDir $RunDir -Msg ("auto_apply_patches round={0} ok" -f $r)
       } catch {
         Write-OrchLog -RunDir $RunDir -Msg ("auto_apply_patches_failed round={0} error={1}" -f $r, $_.Exception.Message)
+        Write-StopRequested -RepoRoot $RepoRoot -RunDir $RunDir -Reason ("auto_apply_patches_failed round={0}" -f $r)
       }
     }
 
@@ -1602,7 +1627,7 @@ if ($existingRunnerScripts -and $existingRunnerScripts.Count -gt 0) {
       try {
         $vp = Join-Path $RepoRoot "scripts\\verify_pipeline.py"
         if (Test-Path -LiteralPath $vp) {
-          & python $vp --repo-root $RepoRoot --run-dir $RunDir --strict | Out-Null
+          Invoke-NativeStrict -Exe "python" -Args @($vp,"--repo-root",$RepoRoot,"--run-dir",$RunDir,"--strict") -Context ("verify_pipeline round={0}" -f $r) | Out-Null
           Write-OrchLog -RunDir $RunDir -Msg ("verify_pipeline round={0} ok" -f $r)
         }
       } catch {

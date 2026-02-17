@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import subprocess
 import sys
@@ -207,6 +208,7 @@ def main() -> int:
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--verify", action="store_true", help="Run lightweight verification after apply.")
     ap.add_argument("--require-decision-files", action="store_true", help="Fail if DECISION_JSON files list is missing or does not cover touched files.")
+    ap.add_argument("--require-diff-blocks", action="store_true", help="Fail if no ```diff blocks are present in the chosen agent output.")
     args = ap.parse_args()
 
     repo_root = Path(args.repo_root).resolve()
@@ -277,10 +279,12 @@ def main() -> int:
         report["decision_files"] = []
 
     if not blocks:
-        report["ok"] = True
+        report["ok"] = not bool(args.require_diff_blocks)
         report["note"] = "no_diff_blocks_found"
+        if args.require_diff_blocks:
+            report["reason"] = "require_diff_blocks_enabled"
         (state_dir / f"patch_apply_round{round_n}.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
-        return 0
+        return 4 if args.require_diff_blocks else 0
 
     # Skip if we already successfully applied this round.
     prior = state_dir / f"patch_apply_round{round_n}.json"

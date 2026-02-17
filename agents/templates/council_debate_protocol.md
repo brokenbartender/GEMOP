@@ -1,46 +1,38 @@
 ## Council Debate Protocol (3 seats)
 
-Applies when running a 3-seat debate/collaboration.
+Applies when running a 3-seat debate/collaboration. This protocol is designed to be machine-checkable and fail-closed.
 
 ### Task (input)
-The task for this debate is:
-
 `{{TASK}}`
 
-### Rounds
-- Default: 4 rounds maximum.
-- R1-R2 (diverge): propose different approaches and challenge assumptions.
-- R3-R4 (converge): merge into one plan; resolve contradictions.
+### Rounds (default 4 max)
+- R1 (Diverge): 10 best options with clear acceptance criteria and the 1-2 risks most likely to sink each option.
+- R2 (Cross-exam): attack the top 3 options; propose fixes; remove duplicates.
+- R3 (Converge): one consolidated plan; define verification commands/tests.
+- R4 (Implement when requested): produce patches as unified diffs; minimal commands; no hand-waving.
 
-### Stop Conditions
-Stop early if:
-- all 3 seats have consensus with no material caveats, or
-- discussion repeats without new evidence/constraints/tests.
+Stop early only if the council has a single plan + verification checklist and no open blockers.
 
-### Output Format (required)
+### Output Contract (required every round, every seat)
 - `Verdict`: Agree | Disagree | Mixed
-- `Critique`: 1-3 bullets (specific; evidence/logic focused)
-- `Improvement`: 1-3 bullets (actionable; testable; include file paths/commands when relevant)
-- `Stop?`: Continue | Stop (1 sentence justification)
+- `Critique`: 1-5 bullets (specific; falsifiable; cite repo files/paths when possible)
+- `Improvement`: 1-5 bullets (actionable; include file paths + exact commands)
+- `Stop?`: Continue | Stop (1 sentence)
+- `DECISION_JSON`: exactly one fenced block named `DECISION_JSON`.
 
-### Implementation Mode (required when applicable)
-If the task text contains `MODE=implementation` or starts with `IMPLEMENT:` then the council is acting as a **control plane**.
+`DECISION_JSON` schema (minimal, strict):
+- `summary` (string)
+- `files` (array of repo-relative paths; empty allowed)
+- `commands` (array of shell commands to verify; empty allowed)
+- `risks` (array of strings; empty allowed)
+- `confidence` (number 0..1)
 
-Additional requirements:
-- The **Judge** must include:
-  - `DECISION: DISPATCH | STOP`
-  - `JOB_JSON:` followed by exactly one fenced ```json block containing a single object.
-- The job JSON must be **minimal and strict** (no prose), and must include:
-  - `job_id` (string, unique)
-  - `repo_root` (string, absolute path)
-  - `goal` (string)
-  - `hard_constraints` (array of strings, optional but recommended)
-  - `acceptance` (array of strings, optional but recommended)
-  - `max_repairs` (int, optional)
-  - `timeout_seconds` (int, optional)
-
-Fail-closed rule: if these fields are missing, or the JSON cannot be parsed, the correct `DECISION` is `STOP`.
+### Implementation Mode
+If the task text contains `MODE=implementation` or starts with `IMPLEMENT:` then:
+- If you propose changes: include at least one fenced ` ```diff` block (unified diff) that applies cleanly.
+- `commands` must include at least one deterministic verification step (e.g. `python -m compileall ...`, `python -m pytest -q`, `node ...`).
+- Fail-closed: if you cannot supply clean diffs and verify commands, set `Stop?` to `Stop` and lower confidence.
 
 ### Verbosity
-- Keep responses tight: <= 200-300 words per round.
-- No freeform essays. Bullets only outside short labels.
+- Tight: <= 250-350 words per round.
+- No essays; prefer bullet lists and explicit file/command references.

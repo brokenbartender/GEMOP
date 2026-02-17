@@ -54,6 +54,9 @@ GCLOUD_KEY_FILE = REPO_ROOT / "gcloud_service_key.json"
 SCOPES = ["https://www.googleapis.com/auth/cloud-platform"]
 # --- END CONFIGURATION ---
 
+class LocalOverload(RuntimeError):
+    """Raised when local inference is intentionally refused to protect the host."""
+
 def log(msg):
     timestamp = dt.datetime.now().isoformat()
     try:
@@ -975,6 +978,8 @@ def run_agent(prompt_path, out_md, fallback_model=None):
         budgets_enabled = (_read_int_env("GEMINI_OP_QUOTA_CLOUD_CALLS", 0) > 0) or (_read_int_env("GEMINI_OP_QUOTA_CLOUD_CALLS_PER_AGENT", 0) > 0)
         cloud_budget_checked = False
         cloud_budget_ok = None
+        spillover_enabled = (os.environ.get("GEMINI_OP_CLOUD_SPILLOVER") or "").strip().lower() in ("1", "true", "yes")
+        raise_local_overload = (os.environ.get("GEMINI_OP_LOCAL_OVERLOAD_RAISE") or "1").strip().lower() in ("1", "true", "yes")
         
         # --- SMART TIERED ROUTING ---
         tier = determine_tier(prompt, role_hint)
@@ -996,7 +1001,7 @@ def run_agent(prompt_path, out_md, fallback_model=None):
                 is_low, info = low_memory()
                 if is_low:
                     log(f"LOCAL_GUARD: low_memory avail_mb={info.get('avail_mb')} min_free_mb={info.get('min_free_mb')}")
-                    return (
+                    msg = (
                         "LOCAL_OVERLOAD: Low free memory detected; refusing local inference to protect the host.\n"
                         f"- agent_id: {agent_id}\n"
                         f"- avail_mb: {info.get('avail_mb')}\n"
@@ -1010,6 +1015,10 @@ def run_agent(prompt_path, out_md, fallback_model=None):
                         "\n"
                         "COMPLETED\n"
                     )
+                    # In hybrid mode, treat local overload as a provider failure so router may try cloud spillover.
+                    if use_router and spillover_enabled and raise_local_overload and _cloud_allowed() and check_internet():
+                        raise LocalOverload(msg)
+                    return msg
             except Exception:
                 pass
             slot_t0 = time.time()
@@ -1021,7 +1030,7 @@ def run_agent(prompt_path, out_md, fallback_model=None):
             max_slots = _read_int_env("GEMINI_OP_MAX_LOCAL_CONCURRENCY", 0)
             if max_slots > 0 and slot is None:
                 log(f"LOCAL_SLOT_TIMEOUT: agent_id={agent_id} waited_s={slot_wait_s} max_slots={max_slots}")
-                return (
+                msg = (
                     "LOCAL_OVERLOAD: Unable to acquire a local Ollama slot within the configured timeout.\n"
                     f"- agent_id: {agent_id}\n"
                     f"- max_local_concurrency: {max_slots}\n"
@@ -1036,14 +1045,29 @@ def run_agent(prompt_path, out_md, fallback_model=None):
                     "\n"
                     "COMPLETED\n"
                 )
+                if use_router and spillover_enabled and raise_local_overload and _cloud_allowed() and check_internet():
+                    raise LocalOverload(msg)
+                return msg
             try:
                 return call_ollama(prompt, local_model)
             finally:
                 _release_local_slot(slot)
 
-        def cloud_budget_ok_for(_provider: str) -> bool:
-            # Enforce cloud allowlist and shared budgets.
-            if not _cloud_allowed_for(agent_id):
+        def cloud_budget_ok_for(provider_name: str) -> bool:
+            # Enforce allowlist/spillover policy + shared budgets.
+            name = str(provider_name or "")
+            if name == "cloud_gemini":
+                if not _cloud_allowed_for(agent_id):
+                    return False
+            elif name == "cloud_gemini_spillover":
+                # Spillover is only allowed when explicitly enabled.
+                # Additionally require a configured budget to avoid unbounded cloud calls.
+                if not spillover_enabled:
+                    return False
+                if not budgets_enabled:
+                    return False
+            else:
+                # Unknown cloud provider name: fail closed.
                 return False
             if not check_internet():
                 return False
@@ -1088,6 +1112,16 @@ def run_agent(prompt_path, out_md, fallback_model=None):
                 else:
                     selected_tier = "local"
             providers.append(ProviderSpec(name="local_ollama", model=local_model, call=local_call, retries=0))
+            # Optional: allow cloud spillover after local failure/overload for non-cloud seats.
+            if spillover_enabled and check_internet():
+                providers.append(
+                    ProviderSpec(
+                        name="cloud_gemini_spillover",
+                        model="gemini-2.5-flash",
+                        call=cloud_call,
+                        retries=0,
+                    )
+                )
 
             rr = router.route(providers)
             if rr.ok:
@@ -1099,7 +1133,10 @@ def run_agent(prompt_path, out_md, fallback_model=None):
                 # Router failed; ensure we at least attempt local once.
                 if rr.provider and rr.provider.startswith("cloud"):
                     log(f"Cloud route failed: {rr.error}; falling back to local.")
-                result = local_call()
+                try:
+                    result = local_call()
+                except LocalOverload as e:
+                    result = str(e)
                 selected_tier = "local"
         else:
             # Legacy routing (kept for emergency fallback).
