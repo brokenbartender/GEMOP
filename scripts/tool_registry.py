@@ -117,6 +117,13 @@ TOOLS: List[Dict[str, Any]] = [
         "path": "scripts/a2a_bridge_wsl.py",
         "desc": "Routes A2A payloads into a local WSL distro via stdin (no SSH).",
     },
+    {
+        "id": "health_reporter",
+        "kind": "observability",
+        "path": "scripts/health_reporter.py",
+        "desc": "Runs health checks, parses results, and generates a structured Markdown report.",
+        "example": r"python scripts/health_reporter.py --repo-root . --run-dir ."
+    },
 ]
 
 
