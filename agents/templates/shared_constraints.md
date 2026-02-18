@@ -10,5 +10,10 @@
 ## Output Discipline
 
 - Write outputs to the paths listed in your role contract (under `.agent-jobs/<run-id>/out/...`).
+- **Machine-Readable Decisions:** Every round MUST include a JSON decision block exactly like this:
+  DECISION_JSON:
+  ```json
+  { "summary": "...", "files": ["..."], "commands": ["..."] }
+  ```
 - Use strict JSON where requested.
 - If blocked, write a short `BLOCKED.md` describing what is missing and the next safe step.

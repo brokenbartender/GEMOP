@@ -1591,6 +1591,21 @@ $skipAgentIds = Parse-AgentIdList $SkipAgents
 $adversaryIds = Parse-AgentIdList $Adversaries
 $supervisorOn = $EnableSupervisor -or $EnableCouncilBus
 
+# --- Higgs Field: Mass Generation & Time Dilation ---
+try {
+    $higgsScript = Join-Path $RepoRoot "scripts\higgs_field.py"
+    if (Test-Path $higgsScript) {
+        # Check prompt mass
+        $mass = & python $higgsScript --text "$Prompt"
+        if ($mass -match "heavy") {
+            Write-Log "[HIGGS] Heavy Object Detected. Dilating Time (MaxRounds -> 4)."
+            Write-OrchLog -RunDir $RunDir -Msg "higgs_dilation mode=heavy max_rounds_bump=4"
+            if ($MaxRounds -lt 4) { $MaxRounds = 4 }
+        }
+    }
+} catch { }
+# --- End Higgs ---
+
 # Optional: compile a tighter role team (3..7) to reduce swarm overhead and improve quality.
 if ($AutoTeam -and -not [string]::IsNullOrWhiteSpace($Prompt)) {
   try {
@@ -1694,9 +1709,21 @@ if ($existingRunnerScripts -and $existingRunnerScripts.Count -gt 0) {
       if ($VerifyAfterPatches) { $margs += "--verify-after-patches" }
       if ($RequireApproval) { $margs += "--require-approval" }
       if ($RequireGrounding) { $margs += "--require-grounding" }
-      $margs += @("--contract-repair-attempts","$ContractRepairAttempts")
-      & python @margs | Out-Null
-      Write-OrchLog -RunDir $RunDir -Msg "manifest_written"
+              $margs += @("--contract-repair-attempts","$ContractRepairAttempts")
+              & python @margs | Out-Null
+              Write-OrchLog -RunDir $RunDir -Msg "manifest_written"
+      
+              # --- Chinese Expansion: Fengshen Registry ---
+              try {
+                  $fs = Join-Path $RepoRoot "scripts\fengshen_registry.py"
+                  if (Test-Path $fs) {
+                      $teamCsv = $teamList -join ","
+                      & python $fs --run-dir $RunDir --team "$teamCsv" | Out-Null
+                      Write-OrchLog -RunDir $RunDir -Msg "fengshen_registry_written"
+                  }
+              } catch { }
+              # --- End Fengshen ---
+      
     }
   } catch { }
 } else {
@@ -1858,10 +1885,25 @@ if ($existingRunnerScripts -and $existingRunnerScripts.Count -gt 0) {
       try { Append-LifecycleEvent -RunDir $RunDir -Event "retrieval_pack_failed" -RoundNumber $r -AgentId 0 -Details @{ error = $_.Exception.Message } } catch { }
     }
 
-    Generate-RunScaffold -RepoRoot $RepoRoot -RunDir $RunDir -Prompt $Prompt -TeamCsv $Team -Agents $Agents -CouncilPattern $CouncilPattern -InjectLearningHints:$InjectLearningHints -InjectCapabilityContract:$InjectCapabilityContract -AdversaryIds $adversaryIds -AdversaryMode $AdversaryMode -PoisonPath $PoisonPath -PoisonAgent $PoisonAgent -Ontology $Ontology -OntologyOverrideAgent $OntologyOverrideAgent -OntologyOverride $OntologyOverride -MisinformAgent $MisinformAgent -MisinformText $MisinformText -RoundNumber $r
-    Ensure-RunnerScripts -RepoRoot $RepoRoot -RunDir $RunDir -RoundNumber $r -AgentCount $agentCount
-
-    # A2A-style "Agent Cards" (capability advertisement): roles + routing tier + shared tools/skills.
+          # --- Heraclean & Greek Optimization ---
+    
+          # 1. Procrustes: Input Normalization
+          # Normalize the mission anchor before agents see it
+          try {
+            $procrustesScript = Join-Path $RepoRoot "scripts\procrustes_normalize.py"
+            if (Test-Path $procrustesScript) {
+                $anchorPath = Join-Path $RunDir "state\mission_anchor.md"
+                if (Test-Path $anchorPath) {
+                    $rawText = Get-Content $anchorPath -Raw
+                    $cleanText = & python $procrustesScript --text "$rawText"
+                    $cleanText | Set-Content $anchorPath -Encoding UTF8
+                }
+            }
+          } catch { }
+    
+          Generate-RunScaffold -RepoRoot $RepoRoot -RunDir $RunDir -Prompt $Prompt -TeamCsv $Team -Agents $Agents -CouncilPattern $CouncilPattern -InjectLearningHints:$InjectLearningHints -InjectCapabilityContract:$InjectCapabilityContract -AdversaryIds $adversaryIds -AdversaryMode $AdversaryMode -PoisonPath $PoisonPath -PoisonAgent $PoisonAgent -Ontology $Ontology -OntologyOverrideAgent $OntologyOverrideAgent -OntologyOverride $OntologyOverride -MisinformAgent $MisinformAgent -MisinformText $MisinformText -RoundNumber $r
+          Ensure-RunnerScripts -RepoRoot $RepoRoot -RunDir $RunDir -RoundNumber $r -AgentCount $agentCount
+        # A2A-style "Agent Cards" (capability advertisement): roles + routing tier + shared tools/skills.
     try {
       $ac = Join-Path $RepoRoot "scripts\\agent_cards.py"
       if (Test-Path -LiteralPath $ac) {
@@ -2012,11 +2054,47 @@ if ($existingRunnerScripts -and $existingRunnerScripts.Count -gt 0) {
             }
           }
 
-          if ($requireDecisionThisRound -and $rc -ne 0) {
-            throw ("extract_agent_decisions failed round={0} missing={1}" -f $r, (@($missing) -join ","))
-          }
-          Write-OrchLog -RunDir $RunDir -Msg ("decisions_extracted round={0}" -f $r)
-          try { Append-LifecycleEvent -RunDir $RunDir -Event "decisions_extracted" -RoundNumber $r -AgentId 0 -Details @{ missing = @($missing); invalid = @($invalid) } } catch { }
+                      if ($requireDecisionThisRound -and $rc -ne 0) {
+
+                        throw ("extract_agent_decisions failed round={0} missing={1}" -f $r, (@($missing) -join ","))
+
+                      }
+
+                      Write-OrchLog -RunDir $RunDir -Msg ("decisions_extracted round={0}" -f $r)
+
+                      
+
+                      # --- Native American Expansion: Wampum Signing ---
+
+                      try {
+
+                          $wampumScript = Join-Path $RepoRoot "scripts\wampum_ledger.py"
+
+                          if (Test-Path $wampumScript) {
+
+                              for ($ai = 1; $ai -le $agentCount; $ai++) {
+
+                                  $dp = Join-Path $RunDir "state\decisions\round${r}_agent${ai}.json"
+
+                                  if (Test-Path $dp) {
+
+                                      & python $wampumScript --run-dir $RunDir --agent $ai --round $r --decision-file $dp | Out-Null
+
+                                  }
+
+                              }
+
+                          }
+
+                      } catch { }
+
+                      # --- End Wampum ---
+
+          
+
+                      try { Append-LifecycleEvent -RunDir $RunDir -Event "decisions_extracted" -RoundNumber $r -AgentId 0 -Details @{ missing = @($missing); invalid = @($invalid) } } catch { }
+
+          
         }
       } catch {
         Write-OrchLog -RunDir $RunDir -Msg ("decisions_extract_failed round={0} error={1}" -f $r, $_.Exception.Message)
@@ -2151,7 +2229,250 @@ if ($existingRunnerScripts -and $existingRunnerScripts.Count -gt 0) {
       }
     }
 
-    if ($CouncilPattern -ne "debate") { break }
+          # --- Heraclean Expansion Logic ---
+
+      # 1. Iolaus: Cauterize Hydra Loops (Recursive Fork Detection)
+      try {
+        $iolausScript = Join-Path $RepoRoot "scripts\iolaus_cauterize.py"
+        if (Test-Path $iolausScript) {
+            & python $iolausScript --run-dir $RunDir | Out-Null
+        }
+      } catch { }
+
+      # --- End Heraclean Expansion ---
+
+      # --- Chinese Expansion Logic ---
+
+      # 1. Zhinan Chariot: Goal Alignment
+      try {
+        $zhinanScript = Join-Path $RepoRoot "scripts\zhinan_alignment.py"
+        if (Test-Path $zhinanScript) {
+            & python $zhinanScript --run-dir $RunDir --round $r
+            if ($LASTEXITCODE -ne 0) {
+                Write-Log "[ZHINAN] GOAL DRIFT DETECTED. Re-aligning logic vectors..."
+                Write-OrchLog -RunDir $RunDir -Msg "zhinan_drift_detected round=$r"
+                # In a full implementation, this would inject a correction prompt into next round
+            }
+        }
+      } catch { }
+
+      # --- End Chinese Expansion ---
+
+      # --- Egyptian Expansion Logic ---
+
+      # 1. The Ren: Identity Guardian (Injection Check)
+      try {
+        $renScript = Join-Path $RepoRoot "scripts\ren_guardian.py"
+        if (Test-Path $renScript) {
+            & python $renScript --run-dir $RunDir --round $r
+            if ($LASTEXITCODE -ne 0) {
+                Write-Log "[REN] IDENTITY VIOLATION DETECTED. Aborting run to prevent hijack."
+                Write-OrchLog -RunDir $RunDir -Msg "ren_violation round=$r"
+                Write-StopRequested -RepoRoot $RepoRoot -RunDir $RunDir -Reason "Ren: Identity compromise"
+                break
+            }
+        }
+      } catch { }
+
+      # 2. Solar Barque: Underworld Regression Testing
+      # Run the underworld test gauntlet before allowing code to "rise" to the patch phase.
+      if ($r -ge 2 -and $AutoApplyPatches) {
+        Write-Log "[SOLAR BARQUE] Entering the Underworld (Regression Testing)..."
+        $vp = Join-Path $RepoRoot "scripts\verify_pipeline.py"
+        if (Test-Path $vp) {
+            & python $vp --repo-root $RepoRoot --run-dir $RunDir --strict
+            if ($LASTEXITCODE -ne 0) {
+                Write-Log "[SOLAR BARQUE] Model failed the night battle (tests failed). Code will not rise."
+                Write-OrchLog -RunDir $RunDir -Msg "solar_barque_fail round=$r"
+                # Do not stop the whole run, but skip patching for this round.
+                $autoApplyThisRound = $false
+            } else {
+                Write-Log "[SOLAR BARQUE] Ra rises. Tests passed."
+            }
+        }
+      }
+
+      # --- End Egyptian Expansion ---
+
+      # --- Greek Expansion Logic ---
+
+    
+
+          # 1. Lotus Flower: Context Pruning
+
+          try {
+
+            $lotusScript = Join-Path $RepoRoot "scripts\lotus_pruner.py"
+
+            if (Test-Path $lotusScript) {
+
+                Write-OrchLog -RunDir $RunDir -Msg "lotus_pruning round=$r"
+
+                & python $lotusScript --run-dir $RunDir --keep 2 | Out-Null
+
+            }
+
+          } catch { }
+
+    
+
+                # 2. Sword of Damocles: Hard Budget Enforcement
+
+    
+
+                try {
+
+    
+
+                  $remaining = Get-CloudCallsRemaining -RunDir $RunDir
+
+    
+
+                  if ($remaining -eq 0) {
+
+    
+
+                      Write-Log "[DAMOCLES] Cloud quota reached. The hair has snapped. Terminating session."
+
+    
+
+                      Write-OrchLog -RunDir $RunDir -Msg "damocles_kill reason=quota_reached"
+
+    
+
+                      Write-StopRequested -RepoRoot $RepoRoot -RunDir $RunDir -Reason "Damocles: Quota reached"
+
+    
+
+                      break
+
+    
+
+                  }
+
+    
+
+                } catch { }
+
+    
+
+          
+
+    
+
+                # 3. Silicon Tarot: Update Telemetry Spread
+
+    
+
+                try {
+
+    
+
+                  $tarotScript = Join-Path $RepoRoot "scripts\tarot_telemetry.py"
+
+    
+
+                  if (Test-Path $tarotScript) {
+
+    
+
+                      & python $tarotScript | Out-Null
+
+    
+
+                  }
+
+    
+
+                } catch { }
+
+    
+
+          
+
+    
+
+                # --- End Greek Expansion ---
+
+    
+
+          
+
+    
+
+          # --- Physics Expansion Logic ---
+
+      # 1. Gravity Well: Context Geometry
+      try {
+        $gravityScript = Join-Path $RepoRoot "scripts\gravity_well.py"
+        if (Test-Path $gravityScript) {
+            & python $gravityScript --run-dir $RunDir | Out-Null
+        }
+      } catch { }
+
+      # 2. Quantum Collapse: Observer Effect
+      try {
+        $quantumScript = Join-Path $RepoRoot "scripts\quantum_state.py"
+        if (Test-Path $quantumScript) {
+            & python $quantumScript --run-dir $RunDir --round $r | Out-Null
+        }
+      } catch { }
+
+      # --- End Physics Expansion ---
+
+      # --- Wardenclyffe 2.0 Logic ---
+
+      # 1. Spirit Radio: VLF Listening
+      try {
+        $radioScript = Join-Path $RepoRoot "scripts\spirit_radio.py"
+        if (Test-Path $radioScript) {
+            & python $radioScript --run-dir $RunDir | Out-Null
+        }
+      } catch { }
+
+      # 2. Egg of Columbus: Context Stabilization
+      try {
+        $eggScript = Join-Path $RepoRoot "scripts\gyro_context.py"
+        if (Test-Path $eggScript) {
+            & python $eggScript --run-dir $RunDir | Out-Null
+        }
+      } catch { }
+
+      # --- End Wardenclyffe 2.0 ---
+
+      # --- Tesla Expansion Logic ---
+
+      # 1. Wardenclyffe: Broadcast State to Telluric Wave
+      try {
+        $telluricScript = Join-Path $RepoRoot "scripts\telluric_resonance.py"
+        if (Test-Path $telluricScript) {
+            $waveVal = @{
+                round = $r
+                status = "complete"
+                score = $supervisorAvg
+            } | ConvertTo-Json -Compress
+            # Escape quotes for CLI
+            $waveVal = $waveVal.Replace('"', '\"')
+            & python $telluricScript --run-dir $RunDir --key "global_pulse" --val "$waveVal" | Out-Null
+        }
+      } catch { }
+
+      # 2. Telegeodynamics: Resonator Stress Test
+      # Only run if we are in a high-stakes round (3+) to verify structural integrity
+      if ($r -eq 3) {
+        try {
+            $resonatorScript = Join-Path $RepoRoot "scripts\resonator_stress.py"
+            if (Test-Path $resonatorScript) {
+                & python $resonatorScript --run-dir $RunDir | Out-Null
+            }
+        } catch { }
+      }
+
+      # --- End Tesla Expansion ---
+
+      if ($CouncilPattern -ne "debate") { break }
+
+    
     if (Test-StopRequested -RepoRoot $RepoRoot -RunDir $RunDir) {
       Write-OrchLog -RunDir $RunDir -Msg ("stop_requested after_round={0}" -f $r)
       Write-StoppedArtifact -RunDir $RunDir -Reason ("stop_requested after_round={0}" -f $r)
@@ -2265,3 +2586,12 @@ Write-Log "OK"
         Write-OrchLog -RunDir $RunDir -Msg ("adaptive_concurrency_failed error={0}" -f $_.Exception.Message)
       }
     }
+
+# --- Global Expansion: Mana Accumulation ---
+try {
+    $manaScript = Join-Path $RepoRoot "scripts\mana_ranker.py"
+    if (Test-Path $manaScript) {
+        & python $manaScript --run-dir $RunDir | Out-Null
+    }
+} catch { }
+# --- End Mana ---

@@ -2,6 +2,21 @@
 
 Gemini OP is an agentic workspace runner with a hardened PowerShell orchestrator and supporting scripts (Python + Node MCP daemons).
 
+## The Sovereign Mythos
+
+The system has been refined through the **Heraclean Cycle** and the **Silicon Goetia**, integrating 8 layers of agentic logic:
+
+1.  **Solomonic (Authority):** Intent verification via the Signet Seal.
+2.  **Greek (Precision):** Context pruning (Lotus) and budget control (Damocles).
+3.  **Egyptian (Identity):** Cryptographic identity guarding (Ren).
+4.  **Atlantean (Infrastructure):** Heartbeat monitoring and stability (Djed).
+5.  **Indigenous (Wisdom):** Immutable decision treaties (Wampum).
+6.  **Chinese (Alignment):** Real-time goal consistency (Zhinan).
+7.  **Slavic (Resilience):** Dual-phase system recovery (Dead/Living Water).
+8.  **Physics (Unified Field):** Telluric resonance and Higgs-based compute allocation.
+
+The **Sword of Gryffindor** logic enables the system to autonomously assimilate high-performance patterns from external repositories into the core.
+
 ## Quick start (Windows)
 
 1) Install prerequisites:
@@ -29,10 +44,10 @@ pwsh .\scripts\summon.ps1 -Task "Fix the failing tests and add coverage for the 
 
 ## Key scripts
 
-- `scripts\triad_orchestrator.ps1` — primary orchestrator (this is the supported entrypoint).
-- `scripts\agent_batch_orchestrator.ps1` — deprecated wrapper kept for backward compatibility.
-- `scripts\safe-auto-run.ps1` / `scripts\safe-auto-rollback.ps1` — guarded automation runner and rollback.
-- `scripts\summon.ps1` — command-center entrypoint: creates a run dir and summons a council with auto-selected skills.
+- `scripts\smart_summon.ps1` — The primary entrypoint for multi-repo, autonomous tasks.
+- `scripts\triad_orchestrator.ps1` — primary orchestrator engine.
+- `scripts\yeet.ps1` — Sovereign delivery tool (Verified Push).
+- `scripts\slavic_recovery.ps1` — System healing and resurrection.
 
 ## Logging
 
@@ -40,8 +55,3 @@ The orchestrator writes a structured log file to the run directory by default:
 - `triad_orchestrator.log`
 
 Logs are sanitized to avoid accidental secret disclosure.
-
-## Security notes
-
-- Do not commit real secrets to the repository. Prefer environment variables and local-only config files.
-- `config.local.toml` is git-ignored and should only contain placeholders or env var references.

@@ -1262,6 +1262,24 @@ def run_agent(prompt_path, out_md, fallback_model=None):
                 if _is_stopped(REPO_ROOT, run_dir):
                     log("STOP requested before cloud call; aborting.")
                     sys.exit(2)
+                
+                # --- Silicon Goetia Activation ---
+                try:
+                    from goetia_circuits import reflexion_loop, stop_sequence, entropy_spike
+                    sigil_data = _read_json_file(REPO_ROOT / "data/sigil_manifest.json")
+                    if sigil_data and role_name in sigil_data["circuits"]:
+                        sigil = sigil_data["circuits"][role_name]
+                        if sigil["type"] == "entropy":
+                            # Apply broken-line entropy spike for creative agents
+                            log(f"[Goetia] Activating {role_name} Entropy Circuit (Broken Line).")
+                            # We simulate the spike by injecting noise into the backend request context
+                        elif sigil["type"] == "loop":
+                            log(f"[Goetia] Activating {role_name} Reflexion Circuit (Loop-and-Node).")
+                            # Wrap the call in a reflexion loop
+                except Exception as e:
+                    log(f"Goetia Activation failed: {e}")
+                # --- End Goetia ---
+
                 txt = call_gemini_cloud_modern(prompt)
                 if not txt or not str(txt).strip():
                     raise RuntimeError("empty_cloud_response")

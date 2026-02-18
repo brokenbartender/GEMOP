@@ -1,0 +1,20 @@
+{
+  "ts": 1771453099.4788938,
+  "active_cards": [
+    {
+      "id": "4_of_Swords",
+      "name": "Sleep Mode",
+      "suit": "Air"
+    },
+    {
+      "id": "Ace_of_Cups",
+      "name": "Data Flow",
+      "suit": "Water"
+    },
+    {
+      "id": "X_Wheel_of_Fortune",
+      "name": "Active Scheduler",
+      "role": "Kernel"
+    }
+  ]
+}

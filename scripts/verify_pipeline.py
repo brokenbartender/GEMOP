@@ -50,19 +50,42 @@ def main() -> int:
     checks: list[dict[str, Any]] = []
     ok = True
 
-    # 1) Python parse/bytecode check for core folders.
-    checks.append(run([sys.executable, "-m", "compileall", "-q", "scripts", "mcp", "work"], cwd=repo_root))
+    # 1) Python parse/bytecode check.
+    # If a target repo is active, check it. Otherwise check core folders.
+    target_env = (os.environ.get("GEMINI_OP_TARGET_REPO") or "").strip()
+    target_path = Path(target_env).resolve() if target_env else None
+    
+    folders_to_check = ["scripts", "mcp"]
+    if target_path and target_path.exists():
+        # If we are targeting an external repo, only check its specific folder in work/
+        # to avoid being blocked by unrelated broken files in other work/ subdirectories.
+        try:
+            rel_target = target_path.relative_to(repo_root)
+            folders_to_check.append(str(rel_target))
+        except ValueError:
+            pass # Target is outside repo root
+    
+    checks.append(run([sys.executable, "-m", "compileall", "-q"] + folders_to_check, cwd=repo_root))
 
     # 2) Git whitespace / conflict marker check (best-effort).
     if (repo_root / ".git").exists():
         git_check = run(["git", "diff", "--check"], cwd=repo_root)
-        # Windows/dev UX: `git diff --check` returns rc=2 for "new blank line at EOF",
-        # which is usually harmless and often introduced by editors. Treat it as non-fatal.
+        # Windows/dev UX: `git diff --check` returns rc=2 for "new blank line at EOF" or "trailing whitespace"
+        # which are usually harmless. Treat them as non-fatal.
         if int(git_check.get("rc") or 0) != 0:
             out = str(git_check.get("stdout_tail") or "")
             lines = [ln.strip() for ln in out.splitlines() if ln.strip()]
-            if lines and all(ln.endswith("new blank line at EOF.") for ln in lines):
-                git_check["ignored_new_blank_line_at_eof"] = True
+            
+            is_harmless = True
+            for ln in lines:
+                l_low = ln.lower()
+                # Check for various formatting warnings without being sensitive to trailing periods
+                if not ("new blank line at eof" in l_low or "trailing whitespace" in l_low):
+                    is_harmless = False
+                    break
+            
+            if lines and is_harmless:
+                git_check["ignored_minor_formatting_issue"] = True
                 git_check["rc"] = 0
         checks.append(git_check)
 

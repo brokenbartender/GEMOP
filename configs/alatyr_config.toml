@@ -1,0 +1,21 @@
+# Alatyr-Kamen: The Father of All Stones
+# This is the IMMUTABLE core configuration.
+# Agents are forbidden from modifying this file.
+
+[laws]
+version = "1.0.0"
+immutable = true
+
+[safety]
+sandbox = "workspace-write"
+allow_destructive_ops = false
+max_file_size_bytes = 500000
+
+[authority]
+signet_required = true
+ren_check_frequency = "every_round"
+
+[limits]
+max_agents_per_council = 12
+max_rounds_per_task = 15
+cloud_call_timeout_sec = 60

@@ -48,7 +48,6 @@ Write-Host "[Smart] Selected Team: $teamList" -ForegroundColor Green
 
 # 2. Invoke Summon
 $maxRounds = 2
-# Bump rounds for complex/architectural tasks or when patching is requested
 if ($AutoApplyPatches -or $Task -match "architect|analyze|improve|fix|implement") {
     $maxRounds = 4
     Write-Host "[Smart] Complex task detected. Bumping MaxRounds to $maxRounds." -ForegroundColor Yellow
@@ -60,17 +59,24 @@ $summonArgs = @{
     MaxRounds = $maxRounds
 }
 
-# Default to Online for maximum power if not explicitly disabled (logic handling).
 if ($Online) { $summonArgs['Online'] = $true }
 if ($AutoApplyPatches) { $summonArgs['AutoApplyPatches'] = $true }
 
 Write-Host "[Smart] Summoning Council..." -ForegroundColor Cyan
+# Capture the output to extract RunDir if possible, or just rely on latest run directory detection
 & .\scripts\summon.ps1 @summonArgs
+$rc = $LASTEXITCODE
+
+# Find the run directory we just created
+$latestRunDir = (Get-ChildItem "$RepoRoot\.agent-jobs" -Directory | Sort-Object LastWriteTime -Descending | Select-Object -First 1).FullName
 
 # 3. Yeet (Commit & Push)
-if ($Yeet -and $LASTEXITCODE -eq 0) {
+if ($Yeet -and $rc -eq 0) {
     Write-Host "[Smart] Yeeting changes..." -ForegroundColor Magenta
-    $yeetArgs = @{}
+    $yeetArgs = @{
+        RunDir = $latestRunDir
+        Prompt = $Task
+    }
     if (-not [string]::IsNullOrWhiteSpace($TargetRepo)) {
         $yeetArgs['TargetRepo'] = $TargetRepo
     }

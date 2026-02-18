@@ -34,6 +34,14 @@ def assemble(base_path: Path, profile_path: Path, local_path: Path) -> str:
         parts.append("# --- configs/config.local.toml (ignored) ---")
         parts.append(local)
 
+    # Alatyr-Kamen: The Final Immutable Layer
+    alatyr_path = Path(__file__).resolve().parents[1] / "configs" / "alatyr_config.toml"
+    alatyr = read_text_if_exists(alatyr_path)
+    if alatyr:
+        parts.append("")
+        parts.append("# --- configs/alatyr_config.toml (IMMUTABLE) ---")
+        parts.append(alatyr)
+
     return ("\n".join(parts).strip() + "\n") if parts else ""
 
 
