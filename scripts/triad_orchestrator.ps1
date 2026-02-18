@@ -1394,6 +1394,18 @@ function Invoke-RunAgents {
 
     $running += [pscustomobject]@{ Proc=$p; Started=(Get-Date); Script=$s.Name; AgentId=$agentId }
     Write-Log "spawned $($s.Name) pid=$($p.Id)"
+
+    # --- Thermodynamics: Navier-Stokes Fluid Dynamics (Throttle) ---
+    if (Test-Path $thermoScript) {
+        $qDepth = $running.Count
+        $complexity = 1.0 # Base task complexity
+        $flow = & python $thermoScript --run-dir $RunDir --mode navier --queue $qDepth --val $complexity
+        if ($flow -match "throttle") {
+            Write-Log "[NAVIER] TURBULENCE DETECTED. Increasing inter-agent cooldown."
+            Start-Sleep -Seconds 2
+        }
+    }
+    # --- End Navier ---
   }
 
   while ($running.Count -gt 0) {
@@ -1606,6 +1618,11 @@ try {
 } catch { }
 # --- End Higgs ---
 
+# --- Thermodynamics of Intelligence: Phase V ---
+$thermoScript = Join-Path $RepoRoot "scripts\thermodynamics.py"
+$maxwellScript = Join-Path $RepoRoot "scripts\maxwells_demon.py"
+# --- End Thermodynamics Init ---
+
 # Optional: compile a tighter role team (3..7) to reduce swarm overhead and improve quality.
 if ($AutoTeam -and -not [string]::IsNullOrWhiteSpace($Prompt)) {
   try {
@@ -1800,6 +1817,21 @@ if ($existingRunnerScripts -and $existingRunnerScripts.Count -gt 0) {
       break
     }
 
+    # --- Thermodynamics: Lyapunov Exponent (Hallucination Horizon) ---
+    if ($r -ge 4 -and (Test-Path $thermoScript)) {
+        # Check semantic distance (simulated for now)
+        $distance = 5.0
+        $divergence = & python $thermoScript --run-dir $RunDir --mode lyapunov --round $r --val $distance
+        if ($divergence -match "kill") {
+            Write-Log "[LYAPUNOV] HALLUCINATION HORIZON DETECTED. Cauterizing threads."
+            Write-OrchLog -RunDir $RunDir -Msg "lyapunov_kill round=$r"
+            if (Test-Path $iolausScript) {
+                & python $iolausScript --run-dir $RunDir --lyapunov --round $r
+            }
+        }
+    }
+    # --- End Lyapunov ---
+
     # Optional: ingest safe URL sources for agents before the first round.
     # Supports:
     # - explicit URLs via -ResearchUrls / -ResearchUrlsFile
@@ -1977,6 +2009,20 @@ if ($existingRunnerScripts -and $existingRunnerScripts.Count -gt 0) {
     Write-OrchLog -RunDir $RunDir -Msg "round_complete round=$r"
     try { Append-LifecycleEvent -RunDir $RunDir -Event "round_complete" -RoundNumber $r -AgentId 0 -Details @{} } catch { }
     try { Update-RunLedgerRoundEvent -RunDir $RunDir -RoundNumber $r -Event "complete" } catch { }
+
+    # --- Thermodynamics: Boltzmann Entropy (Maxwell's Demon) ---
+    if (Test-Path $thermoScript) {
+        # Check entropy of the round
+        $entropyStatus = & python $thermoScript --run-dir $RunDir --mode entropy --round $r --val 1.0
+        if ($entropyStatus -match "compress") {
+            Write-Log "[MAXWELL] Entropy too high. Radiating heat (context compression)."
+            Write-OrchLog -RunDir $RunDir -Msg "maxwell_compression round=$r"
+            if (Test-Path $maxwellScript) {
+                & python $maxwellScript --run-dir $RunDir --round $r
+            }
+        }
+    }
+    # --- End Maxwell ---
 
     if ($ExtractDecisions -or $RequireDecisionJson) {
       # Round 1 is typically "analysis/research" and often should not be forced to emit DECISION_JSON.
@@ -2294,27 +2340,39 @@ if ($existingRunnerScripts -and $existingRunnerScripts.Count -gt 0) {
 
       # --- End Egyptian Expansion ---
 
-      # --- Greek Expansion Logic ---
-
-    
-
-          # 1. Lotus Flower: Context Pruning
-
-          try {
-
-            $lotusScript = Join-Path $RepoRoot "scripts\lotus_pruner.py"
-
-            if (Test-Path $lotusScript) {
-
-                Write-OrchLog -RunDir $RunDir -Msg "lotus_pruning round=$r"
-
-                & python $lotusScript --run-dir $RunDir --keep 2 | Out-Null
-
-            }
-
-          } catch { }
-
-    
+                # --- Greek Expansion Logic ---
+      
+          
+      
+                # 1. Lotus Flower: Context Pruning
+      
+                try {
+      
+                  $lotusScript = Join-Path $RepoRoot "scripts\lotus_pruner.py"
+      
+                  if (Test-Path $lotusScript) {
+      
+                      # --- Thermodynamics: Landauer's Principle (Cost of Forgetting) ---
+                      $shouldPrune = $true
+                      if (Test-Path $thermoScript) {
+                          $bits = 1000 # Simulated bits to erase
+                          $landauer = & python $thermoScript --run-dir $RunDir --mode landauer --tokens $bits
+                          if ($landauer -match "keep") {
+                              Write-Log "[LANDAUER] Erasure cost too high. Retaining context to preserve latent energy."
+                              $shouldPrune = $false
+                          }
+                      }
+      
+                      if ($shouldPrune) {
+                          Write-OrchLog -RunDir $RunDir -Msg "lotus_pruning round=$r"
+                          & python $lotusScript --run-dir $RunDir --keep 2 | Out-Null
+                      }
+                      # --- End Landauer ---
+      
+                  }
+      
+                } catch { }
+          
 
                 # 2. Sword of Damocles: Hard Budget Enforcement
 
