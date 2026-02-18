@@ -36,17 +36,32 @@ ALLOWED_PREFIXES = (
     "mcp/",
     "configs/",
     "agents/templates/",
+    "work/",
 )
 
 MAX_PATCH_BYTES = 200_000
 MAX_TOUCHED_FILES = 25
 
 
-def _norm_path(p: str) -> str:
+def _norm_path(p: str, target_repo: Path | None = None) -> str:
     s = (p or "").strip().replace("\\\\", "/")
     if s.startswith("a/") or s.startswith("b/"):
         s = s[2:]
-    return s.lstrip("./")
+    res = s.lstrip("./")
+    
+    # If target_repo is provided and the path is relative to it, strip the repo name to avoid double-prepending
+    if target_repo:
+        try:
+            # Check if path starts with the repo's name (e.g., work/Enterprise...)
+            repo_part = target_repo.name
+            if res.startswith(f"work/{repo_part}/"):
+                res = res[len(f"work/{repo_part}/"):]
+            elif res.startswith(f"{repo_part}/"):
+                res = res[len(f"{repo_part}/"):]
+        except Exception:
+            pass
+            
+    return res
 
 
 def extract_file_blocks(text: str) -> list[tuple[str, str]]:
@@ -484,6 +499,12 @@ def main() -> int:
     state_dir = run_dir / "state"
     state_dir.mkdir(parents=True, exist_ok=True)
 
+    # Multi-repo support: if GEMINI_OP_TARGET_REPO is set, use it as the base for file ops.
+    target_repo_env = os.environ.get("GEMINI_OP_TARGET_REPO", "").strip()
+    target_repo = Path(target_repo_env).resolve() if target_repo_env else repo_root
+    if target_repo_env:
+        print(f"[Multi-Repo] Targeting: {target_repo}")
+
     requested_agent = int(args.agent or 0)
     agent_id = requested_agent
     if agent_id <= 0:
@@ -562,7 +583,7 @@ def main() -> int:
         cited = set(re.findall(r"(?im)\b(?:docs|scripts|mcp|configs|agents)/[a-z0-9_./\\-]+\b", out_txt or ""))
         cited_ok = False
         for c in cited:
-            p = _norm_path(c)
+            p = _norm_path(c, target_repo=target_repo)
             if not p:
                 continue
             try:
@@ -669,7 +690,7 @@ def main() -> int:
 
     # Apply direct file blocks first
     for rel_path, content in file_blocks:
-        safe_path = _norm_path(rel_path)
+        safe_path = _norm_path(rel_path, target_repo=target_repo)
         block_report: dict[str, Any] = {"type": "file", "path": safe_path, "ok": True, "touched_files": [safe_path]}
         
         if is_blocked(safe_path):
@@ -685,7 +706,7 @@ def main() -> int:
             continue
 
         try:
-            dst = repo_root / safe_path
+            dst = target_repo / safe_path
             dst.parent.mkdir(parents=True, exist_ok=True)
             dst.write_text(content, encoding="utf-8")
         except Exception as e:
@@ -750,7 +771,7 @@ def main() -> int:
             continue
 
         if not allow_any:
-            disallowed = [p for p in touched_norm if not any(_norm_path(p).startswith(pref) for pref in ALLOWED_PREFIXES)]
+            disallowed = [p for p in touched_norm if not any(_norm_path(p, target_repo=target_repo).startswith(pref) for pref in ALLOWED_PREFIXES)]
             if disallowed:
                 block_report.update({"ok": False, "reason": "path_not_allowed", "disallowed": disallowed[:50]})
                 report["ok"] = False
@@ -771,7 +792,7 @@ def main() -> int:
         # of failing the whole block.
         try:
             if len(touched_norm) == 1 and _is_new_file_patch(block, touched_norm[0]):
-                existing = repo_root / touched_norm[0]
+                existing = target_repo / touched_norm[0]
                 if existing.exists():
                     block_report["note"] = "new_file_already_exists_skip"
                     report["blocks"].append(block_report)
@@ -779,7 +800,7 @@ def main() -> int:
         except Exception:
             pass
 
-        chk = run(["git", "apply", f"-p{int(strip_level)}", "--check", str(patch_path)], cwd=repo_root)
+        chk = run(["git", "apply", f"-p{int(strip_level)}", "--check", str(patch_path)], cwd=target_repo)
         block_report["git_apply_check_rc"] = chk.returncode
         if chk.returncode != 0:
             # Salvage path for brand-new docs markdown only.
@@ -787,7 +808,7 @@ def main() -> int:
                 if (
                     len(touched_norm) == 1
                     and _is_new_file_patch(block, touched_norm[0])
-                    and _salvage_new_file_markdown(block, repo_root=repo_root, path_rel=touched_norm[0])
+                    and _salvage_new_file_markdown(block, repo_root=target_repo, path_rel=touched_norm[0])
                 ):
                     block_report["note"] = "salvaged_new_file_markdown"
                     report["blocks"].append(block_report)
@@ -800,7 +821,7 @@ def main() -> int:
             continue
 
         if not args.dry_run:
-            aply = run(["git", "apply", f"-p{int(strip_level)}", "--whitespace=nowarn", str(patch_path)], cwd=repo_root)
+            aply = run(["git", "apply", f"-p{int(strip_level)}", "--whitespace=nowarn", str(patch_path)], cwd=target_repo)
             block_report["git_apply_rc"] = aply.returncode
             if aply.returncode != 0:
                 block_report.update({"ok": False, "reason": "git_apply_failed", "stderr": (aply.stderr or "")[-2000:]})
@@ -809,17 +830,16 @@ def main() -> int:
                 continue
 
             if args.verify:
-                # Use the repo's verify pipeline when available. This catches whitespace
-                # issues (`git diff --check`), secrets, and local validation scripts.
-                vp = repo_root / "scripts" / "verify_pipeline.py"
+                # Use the repo's verify pipeline when available.
+                vp = target_repo / "scripts" / "verify_pipeline.py"
                 if vp.exists():
-                    ver = run([sys.executable, str(vp), "--repo-root", str(repo_root), "--strict"], cwd=repo_root)
+                    ver = run([sys.executable, str(vp), "--repo-root", str(target_repo), "--strict"], cwd=target_repo)
                 else:
-                    ver = run([sys.executable, "-m", "compileall", "scripts", "mcp"], cwd=repo_root)
+                    ver = run([sys.executable, "-m", "compileall", "scripts", "mcp"], cwd=target_repo)
                 block_report["verify_rc"] = ver.returncode
                 if ver.returncode != 0:
                     # Roll back this block.
-                    rb = run(["git", "apply", f"-p{int(strip_level)}", "-R", str(patch_path)], cwd=repo_root)
+                    rb = run(["git", "apply", f"-p{int(strip_level)}", "-R", str(patch_path)], cwd=target_repo)
                     block_report["rollback_rc"] = rb.returncode
                     block_report.update({"ok": False, "reason": "verification_failed"})
                     report["ok"] = False

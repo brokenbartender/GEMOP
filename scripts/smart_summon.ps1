@@ -18,7 +18,9 @@ param(
 
     [switch]$Online,
     [switch]$AutoApplyPatches,
-    [switch]$Yeet
+    [switch]$Yeet,
+    [string]$TargetRepo = "",
+    [switch]$Assimilate
 )
 
 $RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
@@ -68,10 +70,21 @@ Write-Host "[Smart] Summoning Council..." -ForegroundColor Cyan
 # 3. Yeet (Commit & Push)
 if ($Yeet -and $LASTEXITCODE -eq 0) {
     Write-Host "[Smart] Yeeting changes..." -ForegroundColor Magenta
-    & .\scripts\yeet.ps1
+    $yeetArgs = @{}
+    if (-not [string]::IsNullOrWhiteSpace($TargetRepo)) {
+        $yeetArgs['TargetRepo'] = $TargetRepo
+    }
+    & .\scripts\yeet.ps1 @yeetArgs
 }
 
-# 4. Cleanup Daemons
+# 4. Sword of Gryffindor (Assimilate Improvements)
+if ($Assimilate -and -not [string]::IsNullOrWhiteSpace($TargetRepo)) {
+    Write-Host "[Smart] Invoking Sword of Gryffindor..." -ForegroundColor Yellow
+    $swordScript = Join-Path $RepoRoot "scripts\sword_of_gryffindor.py"
+    & python $swordScript --target-repo $TargetRepo --repo-root $RepoRoot
+}
+
+# 5. Cleanup Daemons
 Write-Host "[Smart] Cleaning up background daemons..." -ForegroundColor Yellow
 $stopDaemons = Join-Path $RepoRoot "stop-daemons.ps1"
 if (Test-Path $stopDaemons) {

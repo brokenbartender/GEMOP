@@ -51,7 +51,7 @@ def main() -> int:
     ok = True
 
     # 1) Python parse/bytecode check for core folders.
-    checks.append(run([sys.executable, "-m", "compileall", "-q", "scripts", "mcp"], cwd=repo_root))
+    checks.append(run([sys.executable, "-m", "compileall", "-q", "scripts", "mcp", "work"], cwd=repo_root))
 
     # 2) Git whitespace / conflict marker check (best-effort).
     if (repo_root / ".git").exists():

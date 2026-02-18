@@ -111,7 +111,8 @@ param(
   # Defaults on when not explicitly set (for "summon agents to do X" UX).
   [switch]$AutoSelectSkills,
   [int]$MaxSkills = 14,
-  [int]$SkillCharBudget = 45000
+  [int]$SkillCharBudget = 45000,
+  [string]$TargetRepo = ""
 )
 
 Set-StrictMode -Version Latest
@@ -1079,9 +1080,10 @@ $pt
     }
 
     $roleGuidance = ""
-    switch ($role) {
-      "ResearchLead" { $roleGuidance = "Focus: extract must-haves with citations from sources.md. No fake file paths." }
-      "Engineer" { $roleGuidance = "Focus: implement minimal diffs under scripts/docs/configs/mcp. Output diffs that `git apply` will accept (prefer diff --git a/... b/... headers; complete hunks with @@ lines; no prose inside diff fences)." }
+          switch ($role) {
+            "ResearchLead" { $roleGuidance = "Focus: Use web_search and fetch to find 'Gold Standard' implementations of identified patterns. Extract must-haves with citations from sources.md. No fake file paths." }
+            "Engineer" { $roleGuidance = "Focus: implement minimal diffs under scripts/docs/configs/mcp. Output diffs that `git apply` will accept (prefer diff --git a/... b/... headers; complete hunks with @@ lines; no prose inside diff fences)." }
+    
       "Tester" { $roleGuidance = "Focus: verification commands and failure modes. Challenge invalid assumptions." }
       "Critic" { $roleGuidance = "Focus: attack hallucinations (invalid file refs, fake citations) and simplify scope." }
       "Security" { $roleGuidance = "Focus: tool safety, allowlists, and preventing prompt injection/exfiltration." }
@@ -1493,6 +1495,12 @@ function Write-LearningSummary {
 
 $RepoRoot = Get-RepoRootResolved $RepoRoot
 $env:GEMINI_OP_REPO_ROOT = $RepoRoot
+if ($TargetRepo) { 
+    $env:GEMINI_OP_TARGET_REPO = (Resolve-Path $TargetRepo).Path 
+    Write-Log "targeting external repo: $($env:GEMINI_OP_TARGET_REPO)"
+} else {
+    $env:GEMINI_OP_TARGET_REPO = ""
+}
 if ($Autonomous) { $env:GEMINI_OP_AUTONOMOUS = "1" } else { $env:GEMINI_OP_AUTONOMOUS = "" }
 if ($QuotaCloudCalls -gt 0) { $env:GEMINI_OP_QUOTA_CLOUD_CALLS = "$QuotaCloudCalls" } else { $env:GEMINI_OP_QUOTA_CLOUD_CALLS = "" }
 if ($QuotaCloudCallsPerAgent -gt 0) { $env:GEMINI_OP_QUOTA_CLOUD_CALLS_PER_AGENT = "$QuotaCloudCallsPerAgent" } else { $env:GEMINI_OP_QUOTA_CLOUD_CALLS_PER_AGENT = "" }
