@@ -12,7 +12,14 @@ from typing import Any, Dict, List, Tuple
 
 def _which(cmd: str) -> bool:
     try:
-        cp = subprocess.run([cmd, "--version"], capture_output=True, text=True, timeout=2)
+        cp = subprocess.run(
+            [cmd, "--version"],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=2,
+        )
         return cp.returncode == 0
     except Exception:
         return False
@@ -33,6 +40,8 @@ def _rg(query: str, roots: List[Path], *, max_count: int) -> List[str]:
             ["rg", "-n", "--no-heading", "--color", "never", "-S", "--max-count", str(max_count), query, *roots2],
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             timeout=12,
         )
         out = (cp.stdout or "").splitlines()

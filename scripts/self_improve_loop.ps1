@@ -85,7 +85,7 @@ $stopFlag = Join-Path $stateDir "STOP_SELF_IMPROVE.flag"
 $globalStop1 = Join-Path $RepoRoot "STOP_ALL_AGENTS.flag"
 $globalStop2 = Join-Path $RepoRoot "ramshare\state\STOP"
 $orchestrator = Join-Path $RepoRoot "scripts\agent_batch_orchestrator.ps1"
-$preflight = Join-Path $RepoRoot "scripts\GEMINI_preflight.py"
+$preflight = Join-Path $RepoRoot "scripts\gemini_preflight.py"
 
 $cycle = 0
 $consecutiveFailures = 0

@@ -40,7 +40,14 @@ function Write-StopFlags {
 function Clear-StopFlags {
   Remove-Item -LiteralPath $stop1 -Force -ErrorAction SilentlyContinue
   Remove-Item -LiteralPath $stop2 -Force -ErrorAction SilentlyContinue
-  Write-Host "[STOP] Cleared repo-level STOP flags"
+  
+  # Also clear stale status files to prevent ghost agents in the UI/logs
+  $ipcDir = Join-Path $RepoRoot ".gemini\ipc"
+  if (Test-Path $ipcDir) {
+    Remove-Item (Join-Path $ipcDir "*.status") -Force -ErrorAction SilentlyContinue
+  }
+
+  Write-Host "[STOP] Cleared repo-level STOP flags and stale IPC statuses"
 }
 
 if ($ClearStopFlags) {

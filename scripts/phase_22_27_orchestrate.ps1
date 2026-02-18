@@ -28,7 +28,7 @@ if (-not $RunDir) {
 
 $retry = Join-Path $RepoRoot "scripts\phase_24_retry_loop.ps1"
 $world = Join-Path $RepoRoot "scripts\world_model_snapshot.py"
-$verify = Join-Path $RepoRoot "scripts\GEMINI_verify.py"
+$verify = Join-Path $RepoRoot "scripts\gemini_verify.py"
 
 if (-not (Test-Path -LiteralPath $retry)) { throw "Missing $retry" }
 if (-not (Test-Path -LiteralPath $world)) { throw "Missing $world" }

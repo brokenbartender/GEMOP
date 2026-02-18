@@ -1,0 +1,22 @@
+name: Agent Evaluations
+
+on: [push, pull_request]
+
+jobs:
+  run_evals:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    # - name: Install dependencies (uncomment and modify if specific dependencies are needed)
+    #   run: pip install -r requirements.txt
+
+    - name: Run agent evaluations
+      run: python scripts/eval_harness.py

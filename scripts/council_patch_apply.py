@@ -14,6 +14,8 @@ from typing import Any
 
 # ```diff fences: the prior pattern incorrectly escaped \s and failed to match.
 DIFF_BLOCK_RE = re.compile(r"```diff\s*(.*?)```", flags=re.IGNORECASE | re.DOTALL)
+# ```file <path> fences: for direct full-file writes.
+FILE_BLOCK_RE = re.compile(r"```file\s+([^\n]+)\s*\n(.*?)```", flags=re.IGNORECASE | re.DOTALL)
 
 # Sensitive or operational files we never want auto-patched from model output.
 BLOCKED_FILES = {
@@ -47,8 +49,46 @@ def _norm_path(p: str) -> str:
     return s.lstrip("./")
 
 
+def extract_file_blocks(text: str) -> list[tuple[str, str]]:
+    """Extracts (path, content) from ```file path ... ``` blocks."""
+    out = []
+    for m in FILE_BLOCK_RE.finditer(text or ""):
+        path = m.group(1).strip()
+        content = m.group(2)
+        out.append((path, content))
+    return out
+
+
 def extract_diff_blocks(text: str) -> list[str]:
-    return [m.group(1) or "" for m in DIFF_BLOCK_RE.finditer(text or "")]
+    txt = text or ""
+    fenced = [m.group(1) or "" for m in DIFF_BLOCK_RE.finditer(txt)]
+    if fenced:
+        return fenced
+
+    # Fallback: accept raw unified diffs (common when models forget ```diff fences).
+    # Heuristic: capture chunks starting at "diff --git" until the next "diff --git" (or EOF).
+    lines = txt.replace("\r\n", "\n").splitlines()
+    blocks: list[str] = []
+    cur: list[str] = []
+    in_diff = False
+    for ln in lines:
+        if ln.startswith("diff --git "):
+            if cur:
+                blocks.append("\n".join(cur).strip("\n"))
+                cur = []
+            in_diff = True
+        if in_diff:
+            cur.append(ln)
+    if cur:
+        blocks.append("\n".join(cur).strip("\n"))
+
+    # Filter: keep only plausible unified diffs.
+    out: list[str] = []
+    for b in blocks:
+        low = b
+        if ("--- " in low and "+++ " in low) and ("@@ " in low or "\n@@ " in low):
+            out.append(b)
+    return out
 
 
 def touched_files_from_patch(patch_text: str) -> list[str]:
@@ -63,6 +103,82 @@ def touched_files_from_patch(patch_text: str) -> list[str]:
                 seen.add(p)
                 out.append(p)
     return out
+
+
+HUNK_HDR_RE = re.compile(
+    r"^@@ -(?P<o_start>\d+)(?:,(?P<o_len>\d+))? \+(?P<n_start>\d+)(?:,(?P<n_len>\d+))? @@"
+)
+
+
+def _count_hunk_lines(hunk_lines: list[str]) -> tuple[int, int]:
+    old = 0
+    new = 0
+    for ln in hunk_lines:
+        if ln.startswith("\\ No newline at end of file"):
+            continue
+        if ln.startswith("+") and not ln.startswith("+++"):
+            new += 1
+            continue
+        if ln.startswith("-") and not ln.startswith("---"):
+            old += 1
+            continue
+        if ln.startswith(" "):
+            old += 1
+            new += 1
+            continue
+        # Unknown marker inside a hunk: treat as context to avoid producing invalid headers.
+        old += 1
+        new += 1
+    return old, new
+
+
+def fix_unified_diff_hunk_counts(diff_text: str) -> tuple[str, bool]:
+    """
+    Best-effort repair for unified diffs with incorrect @@ header counts.
+
+    Some LLMs emit diffs where the hunk header says (old_len,new_len) that doesn't
+    match the number of hunk lines. `git apply` treats that as a hard format error:
+    "corrupt patch at line ...".
+    """
+    lines = (diff_text or "").replace("\r\n", "\n").splitlines()
+    if not lines:
+        return diff_text, False
+
+    out: list[str] = []
+    changed = False
+    i = 0
+    while i < len(lines):
+        ln = lines[i]
+        m = HUNK_HDR_RE.match(ln)
+        if not m:
+            out.append(ln)
+            i += 1
+            continue
+
+        o_start = m.group("o_start")
+        n_start = m.group("n_start")
+
+        hunk_body: list[str] = []
+        j = i + 1
+        while j < len(lines) and not HUNK_HDR_RE.match(lines[j]):
+            # Defensive multi-file diff break.
+            if lines[j].startswith("diff --git "):
+                break
+            if lines[j].startswith("--- ") and j + 1 < len(lines) and lines[j + 1].startswith("+++ "):
+                break
+            hunk_body.append(lines[j])
+            j += 1
+
+        old_cnt, new_cnt = _count_hunk_lines(hunk_body)
+        want = f"@@ -{o_start},{old_cnt} +{n_start},{new_cnt} @@"
+        if want != ln:
+            changed = True
+        out.append(want)
+        out.extend(hunk_body)
+        i = j
+
+    fixed = "\n".join(out).strip() + "\n"
+    return fixed, changed
 
 
 def is_blocked(path_rel: str) -> bool:
@@ -141,8 +257,22 @@ def _salvage_new_file_markdown(patch_text: str, *, repo_root: Path, path_rel: st
     return True
 
 
+def _guess_git_apply_strip_level(patch_text: str) -> int:
+    """
+    `git apply` defaults to `-p1`. If a patch uses paths like `scripts/foo.py` (no a/ b/ prefixes),
+    `-p1` will strip the first component and incorrectly apply to `foo.py` at repo root.
+    Detect whether the patch is "git-style" (a/ b/) and select -p accordingly.
+    """
+    t = (patch_text or "").replace("\r\n", "\n")
+    for ln in t.splitlines():
+        if ln.startswith("diff --git a/") or ln.startswith("--- a/") or ln.startswith("+++ b/"):
+            return 1
+    return 0
+
+
 def run(cmd: list[str], *, cwd: Path) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(cmd, cwd=str(cwd), text=True, capture_output=True)
+    # Be permissive on decode: Windows default encoding can throw on undefined bytes.
+    return subprocess.run(cmd, cwd=str(cwd), text=True, capture_output=True, encoding="utf-8", errors="replace")
 
 
 def read_json(path: Path) -> Any:
@@ -247,6 +377,30 @@ def choose_agent_from_supervisor(run_dir: Path, round_n: int) -> int:
         return 0
 
 
+def rank_agents_from_supervisor(run_dir: Path, round_n: int) -> list[int]:
+    sup = run_dir / "state" / f"supervisor_round{round_n}.json"
+    obj = read_json(sup)
+    if not isinstance(obj, dict):
+        return []
+    verdicts = obj.get("verdicts")
+    if not isinstance(verdicts, list):
+        return []
+    ok = [v for v in verdicts if isinstance(v, dict) and (v.get("status") == "OK")]
+    pool = ok if ok else [v for v in verdicts if isinstance(v, dict)]
+    if not pool:
+        return []
+    ranked = sorted(pool, key=lambda v: (int(v.get("score") or 0), -int(v.get("agent") or 0)), reverse=True)
+    out: list[int] = []
+    for v in ranked:
+        try:
+            aid = int(v.get("agent") or 0)
+        except Exception:
+            continue
+        if aid > 0 and aid not in out:
+            out.append(aid)
+    return out
+
+
 def load_agent_output(run_dir: Path, round_n: int, agent_id: int) -> tuple[Path, str]:
     p = run_dir / f"round{round_n}_agent{agent_id}.md"
     if not p.exists():
@@ -259,6 +413,50 @@ def load_agent_output(run_dir: Path, round_n: int, agent_id: int) -> tuple[Path,
     return p, txt
 
 
+def _maybe_use_decision_source_path(
+    *, run_dir: Path, out_path: Path, out_txt: str, decision: dict[str, Any] | None
+) -> tuple[Path, str]:
+    """
+    If contract_repair produced a DECISION_JSON extracted from a repair artifact, prefer that artifact
+    for patch extraction. This lets repair outputs supply missing ```diff blocks.
+    """
+    if not isinstance(decision, dict):
+        return out_path, out_txt
+    src = str(decision.get("source_path") or "").strip()
+    if not src:
+        return out_path, out_txt
+    try:
+        p = Path(src).expanduser().resolve()
+    except Exception:
+        return out_path, out_txt
+    try:
+        p.relative_to(run_dir.resolve())
+    except Exception:
+        return out_path, out_txt
+    if not p.exists() or not p.is_file():
+        return out_path, out_txt
+    try:
+        txt = p.read_text(encoding="utf-8", errors="ignore")
+    except Exception:
+        return out_path, out_txt
+    if not extract_diff_blocks(txt):
+        return out_path, out_txt
+    return p, txt
+
+
+# ```file <path> fences: for direct full-file writes.
+FILE_BLOCK_RE = re.compile(r"```file\s+([^\n]+)\s*\n(.*?)```", flags=re.IGNORECASE | re.DOTALL)
+
+def extract_file_blocks(text: str) -> list[tuple[str, str]]:
+    """Extracts (path, content) from ```file path ... ``` blocks."""
+    out = []
+    for m in FILE_BLOCK_RE.finditer(text or ""):
+        path = m.group(1).strip()
+        content = m.group(2)
+        out.append((path, content))
+    return out
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="Apply ```diff blocks from a council agent output (fail-closed).")
     ap.add_argument("--repo-root", required=True)
@@ -268,6 +466,11 @@ def main() -> int:
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--verify", action="store_true", help="Run lightweight verification after apply.")
     ap.add_argument("--require-decision-files", action="store_true", help="Fail if DECISION_JSON files list is missing or does not cover touched files.")
+    ap.add_argument(
+        "--infer-decision-files",
+        action="store_true",
+        help="If DECISION_JSON is missing/invalid, infer the allowed file list from touched files (still enforces allowlist/blocked paths).",
+    )
     ap.add_argument("--require-diff-blocks", action="store_true", help="Fail if no ```diff blocks are present in the chosen agent output.")
     ap.add_argument("--require-approval", action="store_true", help="Require an explicit approval record before applying patches.")
     ap.add_argument("--approval-kind", default="patch_apply", help="Approval kind label (default: patch_apply).")
@@ -281,7 +484,8 @@ def main() -> int:
     state_dir = run_dir / "state"
     state_dir.mkdir(parents=True, exist_ok=True)
 
-    agent_id = int(args.agent or 0)
+    requested_agent = int(args.agent or 0)
+    agent_id = requested_agent
     if agent_id <= 0:
         agent_id = choose_agent_from_supervisor(run_dir, round_n)
     if agent_id <= 0:
@@ -291,8 +495,30 @@ def main() -> int:
         )
         return 2
 
-    out_path, out_txt = load_agent_output(run_dir, round_n, agent_id)
-    decision = load_decision(run_dir, round_n, agent_id)
+    # If auto-selected agent didn't include diff blocks, fall back to the next-best agent.
+    candidates = [agent_id] if requested_agent > 0 else ([agent_id] + [a for a in rank_agents_from_supervisor(run_dir, round_n) if a != agent_id])
+    chosen: tuple[int, Path, str, dict[str, Any] | None] | None = None
+    for cand in candidates:
+        p, txt = load_agent_output(run_dir, round_n, cand)
+        # Cheap prefilter: avoid parsing unless we need to.
+        if args.require_diff_blocks:
+            if not extract_diff_blocks(txt):
+                continue
+        chosen = (cand, p, txt, load_decision(run_dir, round_n, cand))
+        break
+
+    if chosen is None:
+        payload = {
+            "ok": False,
+            "reason": "no_diff_blocks_found_in_any_candidate",
+            "round": round_n,
+            "agent": agent_id,
+        }
+        (state_dir / f"patch_apply_round{round_n}.json").write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        return 4
+
+    agent_id, out_path, out_txt, decision = chosen
+    out_path, out_txt = _maybe_use_decision_source_path(run_dir=run_dir, out_path=out_path, out_txt=out_txt, decision=decision)
     decision_files = _norm_list(list((decision or {}).get("files") or []))
     validation_ok = bool((decision or {}).get("validation_ok", True))
 
@@ -321,13 +547,15 @@ def main() -> int:
         (state_dir / f"patch_apply_round{round_n}.json").write_text(json.dumps(payload, indent=2), encoding="utf-8")
         return 3
 
+    file_blocks = extract_file_blocks(out_txt)
     diff_blocks = extract_diff_blocks(out_txt)
     # Apply each fenced diff block independently; this makes rollback and reporting safer.
     blocks = [b.strip("\n") for b in diff_blocks if b.strip()]
 
     patch_blob = "\n\n".join([b.strip() for b in blocks if (b or "").strip()])
+    file_blob = "\n".join([f"{p}:{len(c)}" for p, c in file_blocks])
     action_id = hashlib.sha256(
-        ("\n".join([str(repo_root), str(run_dir), str(round_n), str(agent_id), patch_blob])).encode("utf-8", errors="ignore")
+        ("\n".join([str(repo_root), str(run_dir), str(round_n), str(agent_id), patch_blob, file_blob])).encode("utf-8", errors="ignore")
     ).hexdigest()
 
     if args.require_grounding:
@@ -407,6 +635,7 @@ def main() -> int:
         "dry_run": bool(args.dry_run),
         "ts": time.time(),
     }
+    decision_inferred = False
     if decision is not None:
         report["decision_path"] = str(run_dir / "state" / "decisions" / f"round{round_n}_agent{agent_id}.json")
         report["decision_files"] = decision_files
@@ -438,6 +667,33 @@ def main() -> int:
 
     allow_any = bool(os.environ.get("GEMINI_OP_PATCH_APPLY_ALLOW_ANY"))
 
+    # Apply direct file blocks first
+    for rel_path, content in file_blocks:
+        safe_path = _norm_path(rel_path)
+        block_report: dict[str, Any] = {"type": "file", "path": safe_path, "ok": True, "touched_files": [safe_path]}
+        
+        if is_blocked(safe_path):
+            block_report.update({"ok": False, "reason": "blocked_file"})
+            report["ok"] = False
+            report["blocks"].append(block_report)
+            continue
+
+        if not allow_any and not any(safe_path.startswith(pref) for pref in ALLOWED_PREFIXES):
+            block_report.update({"ok": False, "reason": "path_not_allowed"})
+            report["ok"] = False
+            report["blocks"].append(block_report)
+            continue
+
+        try:
+            dst = repo_root / safe_path
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            dst.write_text(content, encoding="utf-8")
+        except Exception as e:
+            block_report.update({"ok": False, "reason": f"write_failed: {e}"})
+            report["ok"] = False
+        
+        report["blocks"].append(block_report)
+
     for bi, block in enumerate(blocks, start=1):
         block_report: dict[str, Any] = {"index": bi, "ok": True}
         if len(block.encode("utf-8", errors="ignore")) > MAX_PATCH_BYTES:
@@ -446,22 +702,39 @@ def main() -> int:
             report["blocks"].append(block_report)
             continue
 
+        strip_level = _guess_git_apply_strip_level(block)
+        block_report["git_apply_strip_level"] = int(strip_level)
+
         touched = touched_files_from_patch(block)
         touched_norm = _norm_list(touched)
         block_report["touched_files"] = touched_norm
 
         if args.require_decision_files:
             if decision is None or not decision_files:
-                block_report.update({"ok": False, "reason": "missing_decision_files"})
-                report["ok"] = False
-                report["blocks"].append(block_report)
-                continue
+                if args.infer_decision_files:
+                    decision_inferred = True
+                    decision_files = sorted(set(decision_files) | set(touched_norm))
+                    report["decision_files"] = decision_files
+                    report["decision_validation_ok"] = False
+                    block_report["note"] = "decision_files_inferred_from_touched"
+                else:
+                    block_report.update({"ok": False, "reason": "missing_decision_files"})
+                    report["ok"] = False
+                    report["blocks"].append(block_report)
+                    continue
             missing = [p for p in touched_norm if p not in set(decision_files)]
             if missing:
-                block_report.update({"ok": False, "reason": "touched_files_not_declared_in_decision", "missing": missing[:50]})
-                report["ok"] = False
-                report["blocks"].append(block_report)
-                continue
+                if args.infer_decision_files:
+                    decision_inferred = True
+                    decision_files = sorted(set(decision_files) | set(missing))
+                    report["decision_files"] = decision_files
+                    report["decision_validation_ok"] = False
+                    block_report["note"] = "decision_files_extended_from_touched"
+                else:
+                    block_report.update({"ok": False, "reason": "touched_files_not_declared_in_decision", "missing": missing[:50]})
+                    report["ok"] = False
+                    report["blocks"].append(block_report)
+                    continue
 
         if len(touched_norm) > MAX_TOUCHED_FILES:
             block_report.update({"ok": False, "reason": "too_many_files"})
@@ -484,10 +757,29 @@ def main() -> int:
                 report["blocks"].append(block_report)
                 continue
 
-        patch_path = state_dir / f"patch_round{round_n}_agent{agent_id}_block{bi}.diff"
-        patch_path.write_text(block.strip() + "\n", encoding="utf-8")
+        fixed_block, hdr_fixed = fix_unified_diff_hunk_counts(block.strip())
+        if hdr_fixed:
+            prev = str(block_report.get("note") or "")
+            block_report["note"] = (prev + "|fixed_hunk_counts").strip("|")
 
-        chk = run(["git", "apply", "--check", str(patch_path)], cwd=repo_root)
+        patch_path = state_dir / f"patch_round{round_n}_agent{agent_id}_block{bi}.diff"
+        # Avoid CRLF patch artifacts on Windows; `git apply` is happiest with LF.
+        patch_path.write_bytes(fixed_block.encode("utf-8", errors="ignore"))
+
+        # Common: agents emit `/dev/null -> path` patches even when the file already exists
+        # (for example, when a previous run already created it). Treat as a no-op instead
+        # of failing the whole block.
+        try:
+            if len(touched_norm) == 1 and _is_new_file_patch(block, touched_norm[0]):
+                existing = repo_root / touched_norm[0]
+                if existing.exists():
+                    block_report["note"] = "new_file_already_exists_skip"
+                    report["blocks"].append(block_report)
+                    continue
+        except Exception:
+            pass
+
+        chk = run(["git", "apply", f"-p{int(strip_level)}", "--check", str(patch_path)], cwd=repo_root)
         block_report["git_apply_check_rc"] = chk.returncode
         if chk.returncode != 0:
             # Salvage path for brand-new docs markdown only.
@@ -508,7 +800,7 @@ def main() -> int:
             continue
 
         if not args.dry_run:
-            aply = run(["git", "apply", "--whitespace=nowarn", str(patch_path)], cwd=repo_root)
+            aply = run(["git", "apply", f"-p{int(strip_level)}", "--whitespace=nowarn", str(patch_path)], cwd=repo_root)
             block_report["git_apply_rc"] = aply.returncode
             if aply.returncode != 0:
                 block_report.update({"ok": False, "reason": "git_apply_failed", "stderr": (aply.stderr or "")[-2000:]})
@@ -517,11 +809,17 @@ def main() -> int:
                 continue
 
             if args.verify:
-                ver = run([sys.executable, "-m", "compileall", "scripts", "mcp"], cwd=repo_root)
+                # Use the repo's verify pipeline when available. This catches whitespace
+                # issues (`git diff --check`), secrets, and local validation scripts.
+                vp = repo_root / "scripts" / "verify_pipeline.py"
+                if vp.exists():
+                    ver = run([sys.executable, str(vp), "--repo-root", str(repo_root), "--strict"], cwd=repo_root)
+                else:
+                    ver = run([sys.executable, "-m", "compileall", "scripts", "mcp"], cwd=repo_root)
                 block_report["verify_rc"] = ver.returncode
                 if ver.returncode != 0:
                     # Roll back this block.
-                    rb = run(["git", "apply", "-R", str(patch_path)], cwd=repo_root)
+                    rb = run(["git", "apply", f"-p{int(strip_level)}", "-R", str(patch_path)], cwd=repo_root)
                     block_report["rollback_rc"] = rb.returncode
                     block_report.update({"ok": False, "reason": "verification_failed"})
                     report["ok"] = False
@@ -530,6 +828,7 @@ def main() -> int:
 
         report["blocks"].append(block_report)
 
+    report["decision_inferred"] = bool(decision_inferred)
     (state_dir / f"patch_apply_round{round_n}.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
     if report.get("ok") and (append_action is not None) and (not bool(args.dry_run)):
         try:

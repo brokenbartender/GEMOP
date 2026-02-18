@@ -21,34 +21,34 @@ Operationalize the conceptual Phase 0-21 model into measurable runtime behavior 
 
 ## Sprint 1 (Immediate)
 1. Phase 19 implementation baseline
-- Files: `scripts/a2a_router.py`, `scripts/GEMINI_dispatcher.py`, `ramshare/state/a2a/idempotency.json`, `ramshare/state/audit/security_alerts.jsonl`
+- Files: `scripts/a2a_router.py`, `scripts/gemini_dispatcher.py`, `ramshare/state/a2a/idempotency.json`, `ramshare/state/audit/security_alerts.jsonl`
 - Deliver:
   - signature capture for recurrent failure/malicious patterns
   - hard reject path with explicit reason codes
   - persistence across restart
 
 2. Phase 20 implementation baseline
-- Files: `scripts/GEMINI_governance.py`, `scripts/GEMINI_budget.py`, `scripts/safe-auto-run.ps1`
+- Files: `scripts/gemini_governance.py`, `scripts/gemini_budget.py`, `scripts/safe-auto-run.ps1`
 - Deliver:
   - per-agent budget quotas
   - auction/priority scoring with hard cap
   - fairness guard (no single agent monopolization)
 
 3. Phase 21 implementation baseline
-- Files: `scripts/memory-ingest.ps1`, `scripts/GEMINI_memory.py`, `scripts/GEMINI_watchdog.py`, `scripts/GEMINI_hud.py`
+- Files: `scripts/memory-ingest.ps1`, `scripts/gemini_memory.py`, `scripts/gemini_watchdog.py`, `scripts/gemini_hud.py`
 - Deliver:
   - scheduled consolidation cycle
   - summarize/distill recent runs into memory store
   - health-aware pause/resume window
 
 4. Genesis startup gate
-- Files: `scripts/GEMINI_preflight.py`, `scripts/safe-auto-run.ps1`
+- Files: `scripts/gemini_preflight.py`, `scripts/safe-auto-run.ps1`
 - Deliver:
   - startup checks for budget, policy mode, queue health, stale locks, capability readiness
   - fail-closed with clear operator remediation
 
 5. Verification + rollback
-- Files: `scripts/GEMINI_verify.py`, `scripts/verify_evidence_chain.py`, `docs/safe-auto-mode.md`
+- Files: `scripts/gemini_verify.py`, `scripts/verify_evidence_chain.py`, `docs/safe-auto-mode.md`
 - Deliver:
   - machine-verifiable acceptance checks
   - rollback points before each major mutation
@@ -66,7 +66,7 @@ Operationalize the conceptual Phase 0-21 model into measurable runtime behavior 
 
 ## Current Status
 - Phase 19: Implemented baseline idempotency/replay rejection in `scripts/a2a_router.py` with persisted state in `ramshare/state/a2a/idempotency.json`.
-- Phase 20: Implemented baseline in `scripts/GEMINI_governance.py` + `scripts/GEMINI_dispatcher.py`:
+- Phase 20: Implemented baseline in `scripts/gemini_governance.py` + `scripts/gemini_dispatcher.py`:
   - per-agent budget quotas via `ramshare/state/governance/agent_budgets.json`
   - auction ordering (`Job.score`) and fairness deferral
   - spend/fairness registration on ACK
@@ -74,7 +74,7 @@ Operationalize the conceptual Phase 0-21 model into measurable runtime behavior 
   - STOP + IN_CONSOLIDATION gating
   - learning close-loop + council reflection + memory compact
   - run reports in `ramshare/state/chronobio/runs/`
-- Verification: strict built-in checks now pass with `python scripts/GEMINI_verify.py --check all --strict` (Phases 19, 20, 21 all green).
+- Verification: strict built-in checks now pass with `python scripts/gemini_verify.py --check all --strict` (Phases 19, 20, 21 all green).
 
 ## Run Commands
 ```powershell

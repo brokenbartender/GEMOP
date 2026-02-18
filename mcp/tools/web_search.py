@@ -1,5 +1,9 @@
 import sys
-from duckduckgo_search import DDGS
+try:
+    # New package name (preferred).
+    from ddgs import DDGS  # type: ignore
+except Exception:  # pragma: no cover
+    from duckduckgo_search import DDGS  # type: ignore
 import argparse
 
 def main():

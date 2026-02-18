@@ -121,7 +121,7 @@ $stdoutLog = Join-Path $runDir 'Gemini.stdout.log'
 $stderrLog = Join-Path $runDir 'Gemini.stderr.log'
 $reportPath = Join-Path $runDir 'report.md'
 $statePath = Join-Path $runDir 'state.json'
-$governanceScript = Join-Path $RepoRoot 'scripts\GEMINI_governance.py'
+$governanceScript = Join-Path $RepoRoot 'scripts\gemini_governance.py'
 
 function Invoke-GovernanceGate([string]$Action, [string]$Details) {
   if (-not (Test-Path -LiteralPath $governanceScript)) { return }

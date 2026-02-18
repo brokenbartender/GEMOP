@@ -42,7 +42,7 @@ def verify_contract(contract: Dict[str, Any]) -> Dict[str, Any]:
 def verify_phase21() -> Dict[str, Any]:
     repo_root = Path(__file__).resolve().parents[1]
     chronobio = repo_root / "scripts" / "chronobio_consolidation.py"
-    watchdog = repo_root / "scripts" / "GEMINI_watchdog.py"
+    watchdog = repo_root / "scripts" / "gemini_watchdog.py"
     ingest = repo_root / "scripts" / "memory-ingest.ps1"
     checks: List[Dict[str, Any]] = [
         verify_exists(str(chronobio)),
@@ -160,11 +160,15 @@ def verify_phase25() -> Dict[str, Any]:
     repo_root = Path(__file__).resolve().parents[1]
     router = repo_root / "scripts" / "a2a_router.py"
     bridge = repo_root / "scripts" / "a2a_bridge_ssh.py"
-    sender = repo_root / "scripts" / "GEMINI_a2a_send_structured.py"
+    sender = repo_root / "scripts" / "gemini_a2a_send_structured.py"
+    receiver = repo_root / "scripts" / "a2a_receive.py"
+    executor = repo_root / "scripts" / "a2a_remote_executor.py"
     checks: List[Dict[str, Any]] = [
         verify_exists(str(router)),
         verify_exists(str(bridge)),
         verify_exists(str(sender)),
+        verify_exists(str(receiver)),
+        verify_exists(str(executor)),
     ]
     checks.append({"type": "phase25_router_cluster_contract", **_contains_all(router, ["outbox", "dlq", "idempotency"])})
     return {"type": "phase25", "ok": all(c.get("ok", False) for c in checks), "checks": checks}
@@ -257,8 +261,8 @@ def verify_phase19() -> Dict[str, Any]:
 
 def verify_phase20() -> Dict[str, Any]:
     repo_root = Path(__file__).resolve().parents[1]
-    governance = repo_root / "scripts" / "GEMINI_governance.py"
-    dispatcher = repo_root / "scripts" / "GEMINI_dispatcher.py"
+    governance = repo_root / "scripts" / "gemini_governance.py"
+    dispatcher = repo_root / "scripts" / "gemini_dispatcher.py"
     budgets = repo_root / "ramshare" / "state" / "governance" / "agent_budgets.json"
     checks: List[Dict[str, Any]] = [
         verify_exists(str(governance)),

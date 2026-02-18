@@ -19,6 +19,8 @@ ramshare/evidence/*
 ramshare/state/*.json
 ramshare/state/*.pid
 ramshare/state/a2a/peers.json
+ramshare/state/a2a/*
+!ramshare/state/a2a/README.md
 scripts/ramshare-sync.local.json
 !ramshare/state/
 !ramshare/state/README.md
@@ -56,6 +58,7 @@ state/evidence/
 state/jobs/
 state/queue/
 state/verify_report.json
+state/a2a_exec_test.txt
 
 # Local learning outputs (generated)
 ramshare/state/learning/

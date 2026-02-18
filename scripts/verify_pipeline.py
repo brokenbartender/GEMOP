@@ -12,7 +12,9 @@ from typing import Any
 
 def run(cmd: list[str], *, cwd: Path) -> dict[str, Any]:
     t0 = time.time()
-    p = subprocess.run(cmd, cwd=str(cwd), text=True, capture_output=True)
+    # Windows default encoding (cp1252) can choke on undefined bytes from subprocess output.
+    # Be permissive: never fail the pipeline due to decode errors.
+    p = subprocess.run(cmd, cwd=str(cwd), text=True, capture_output=True, encoding="utf-8", errors="replace")
     return {
         "cmd": cmd,
         "rc": int(p.returncode),
@@ -53,11 +55,25 @@ def main() -> int:
 
     # 2) Git whitespace / conflict marker check (best-effort).
     if (repo_root / ".git").exists():
-        checks.append(run(["git", "diff", "--check"], cwd=repo_root))
+        git_check = run(["git", "diff", "--check"], cwd=repo_root)
+        # Windows/dev UX: `git diff --check` returns rc=2 for "new blank line at EOF",
+        # which is usually harmless and often introduced by editors. Treat it as non-fatal.
+        if int(git_check.get("rc") or 0) != 0:
+            out = str(git_check.get("stdout_tail") or "")
+            lines = [ln.strip() for ln in out.splitlines() if ln.strip()]
+            if lines and all(ln.endswith("new blank line at EOF.") for ln in lines):
+                git_check["ignored_new_blank_line_at_eof"] = True
+                git_check["rc"] = 0
+        checks.append(git_check)
 
     # 3) Secret scan on current diff (useful after auto-apply).
     if (repo_root / "scripts" / "scan_secrets.py").exists():
         checks.append(run([sys.executable, "scripts/scan_secrets.py", "--diff"], cwd=repo_root))
+
+    # 4) Optional: validate local tool-contract scaffolding (if present).
+    # Keep this lightweight; it's meant to catch obvious import/path issues.
+    if (repo_root / "scripts" / "validate_tool_contracts.py").exists():
+        checks.append(run([sys.executable, "scripts/validate_tool_contracts.py"], cwd=repo_root))
 
     ok = all(int(c.get("rc") or 0) == 0 for c in checks)
     report = {

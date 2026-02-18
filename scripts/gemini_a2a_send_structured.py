@@ -15,7 +15,7 @@ ACK_SCHEMA_VERSION = "a2a.ack.v1"
 
 ENV_PATH = Path(r"C:\Users\codym\agentic-console\.env")
 REPO_ROOT = Path(os.environ.get("GEMINI_OP_REPO_ROOT", Path(__file__).resolve().parents[1]))
-PREFLIGHT_SCRIPT = REPO_ROOT / "scripts" / "GEMINI_preflight.py"
+PREFLIGHT_SCRIPT = REPO_ROOT / "scripts" / "gemini_preflight.py"
 TASK_PATH = Path(r"C:\Users\codym\.Gemini\current_task.json")
 
 

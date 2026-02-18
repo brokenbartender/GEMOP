@@ -5,13 +5,14 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $stopped = 0
-$pidFile = Join-Path 'C:\Gemini\ramshare\state' ("watchdog.{0}.pid" -f $Profile)
+$RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+$pidFile = Join-Path (Join-Path $RepoRoot 'ramshare\state') ("watchdog.{0}.pid" -f $Profile)
 
 $procs = Get-CimInstance Win32_Process -Filter "Name='python.exe' OR Name='pythonw.exe'" -ErrorAction SilentlyContinue
 foreach ($p in $procs) {
   $cmd = [string]$p.CommandLine
   if (-not $cmd) { continue }
-  if (($cmd -like "*GEMINI_watchdog.py*") -and ($cmd -like "*--profile $Profile*")) {
+  if (($cmd -like "*gemini_watchdog.py*") -and ($cmd -like "*--profile $Profile*")) {
     Stop-Process -Id $p.ProcessId -Force -ErrorAction SilentlyContinue
     $stopped += 1
   }

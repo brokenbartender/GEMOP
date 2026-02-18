@@ -21,14 +21,14 @@ REPO_ROOT = repo_root()
 AGENTIC_DIR = Path(r"C:\Users\codym\agentic-console")
 CONTROL_SCRIPT = AGENTIC_DIR / "scripts" / "a2a_control.py"
 STATE_SCRIPT = AGENTIC_DIR / "scripts" / "a2a_system_state.py"
-BUDGET_SCRIPT = REPO_ROOT / "scripts" / "GEMINI_budget.py"
+BUDGET_SCRIPT = REPO_ROOT / "scripts" / "gemini_budget.py"
 CHRONOBIO_SCRIPT = REPO_ROOT / "scripts" / "chronobio_consolidation.py"
 STOP_FLAG = REPO_ROOT / "ramshare" / "state" / "STOP"
 IN_CONSOLIDATION_FLAG = REPO_ROOT / "ramshare" / "state" / "chronobio" / "IN_CONSOLIDATION.flag"
 
 
 def run_json(cmd: List[str]) -> Dict:
-    out = subprocess.check_output(cmd, text=True, stderr=subprocess.STDOUT)
+    out = subprocess.check_output(cmd, text=True, encoding="utf-8", errors="replace", stderr=subprocess.STDOUT)
     return json.loads(out)
 
 

@@ -1,7 +1,7 @@
 # Phase 22-27 Execution Plan (Gemini-OP)
 
 Date: 2026-02-11
-Prereq: Phase 0-21 complete and green via `python scripts/GEMINI_verify.py --check all --strict`
+Prereq: Phase 0-21 complete and green via `python scripts/gemini_verify.py --check all --strict`
 
 ## Objective
 Finish the next autonomy tier quickly and safely by hardening council behavior, capability acquisition, retry learning, cluster load routing, safe full-auto lane, and world-model planning.
@@ -37,16 +37,16 @@ Finish the next autonomy tier quickly and safely by hardening council behavior, 
 - Implemented baseline:
   - `scripts/a2a_router.py` idempotency + duplicate reject + outbox/DLQ.
   - `scripts/a2a_bridge_ssh.py` transport layer.
-  - `scripts/GEMINI_a2a_send_structured.py` structured send path.
+  - `scripts/gemini_a2a_send_structured.py` structured send path.
 - Verify:
-  - `python scripts/GEMINI_verify.py --check phase25 --strict`
+  - `python scripts/gemini_verify.py --check phase25 --strict`
 
 ## Phase 26: Safe Full-Auto Release Lane
 - Goal: unattended runs are reversible and auditable.
 - Implemented:
   - `scripts/safe-auto-run.ps1` checkpoint commits + push verification.
 - Verify:
-  - `python scripts/GEMINI_verify.py --check phase26 --strict`
+  - `python scripts/gemini_verify.py --check phase26 --strict`
 
 ## Phase 27: World-Model Planning
 - Goal: persistent planning state from run summaries, quality model, council model, and capabilities.
@@ -54,12 +54,12 @@ Finish the next autonomy tier quickly and safely by hardening council behavior, 
   - `scripts/world_model_snapshot.py` (new) writes `ramshare/state/world_model/latest.json`.
 - Verify:
   - `python scripts/world_model_snapshot.py --refresh`
-  - `python scripts/GEMINI_verify.py --check phase27 --strict`
+  - `python scripts/gemini_verify.py --check phase27 --strict`
 
 ## Fast Finish Command Set
 ```powershell
 # 1) Verify phase foundations (0-21)
-python scripts/GEMINI_verify.py --check all --strict
+python scripts/gemini_verify.py --check all --strict
 
 # 2) Run retry learning pack on target run
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts/phase_24_retry_loop.ps1 -RunDir .agent-jobs/<run-id> -Threshold 70 -MaxReruns 2
@@ -68,13 +68,13 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/phase_24_retry_loop.
 python scripts/world_model_snapshot.py --refresh
 
 # 4) Verify phase 22-27
-python scripts/GEMINI_verify.py --check phase22 --strict
-python scripts/GEMINI_verify.py --check phase23 --strict
-python scripts/GEMINI_verify.py --check phase24 --strict
-python scripts/GEMINI_verify.py --check phase25 --strict
-python scripts/GEMINI_verify.py --check phase26 --strict
-python scripts/GEMINI_verify.py --check phase27 --strict
-python scripts/GEMINI_verify.py --check roadmap --strict
+python scripts/gemini_verify.py --check phase22 --strict
+python scripts/gemini_verify.py --check phase23 --strict
+python scripts/gemini_verify.py --check phase24 --strict
+python scripts/gemini_verify.py --check phase25 --strict
+python scripts/gemini_verify.py --check phase26 --strict
+python scripts/gemini_verify.py --check phase27 --strict
+python scripts/gemini_verify.py --check roadmap --strict
 ```
 
 ## Done Definition

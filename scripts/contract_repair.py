@@ -75,7 +75,8 @@ def _build_repair_prompt(
         "- No prose outside the JSON fence.\n"
         "- The JSON must include keys: summary (string), files (array), commands (array), risks (array), confidence (0..1).\n"
         "- files must be repo-relative paths only (no absolute paths, no drive letters, no .. traversal).\n"
-        "- commands must be runnable commands to verify your suggested work.\n\n"
+        "- For ROUND>=3, commands must be runnable commands to verify your suggested work.\n"
+        "- For ROUND<3, commands may be empty, but include at least one if you can.\n\n"
         "[PRIOR_OUTPUT_TAIL]\n"
         + (prior_tail.strip() or "(empty)") +
         "\n"
@@ -185,6 +186,8 @@ def main() -> int:
             cwd=str(repo_root),
             text=True,
             capture_output=True,
+            encoding="utf-8",
+            errors="replace",
             timeout=int(args.timeout_s),
         )
         report["results"].append(

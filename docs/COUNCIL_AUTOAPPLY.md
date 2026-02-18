@@ -40,6 +40,9 @@ Commands:
 # Safe URL fetch before Round 1 (no search, no CAPTCHA bypass; just fetch + cache)
 .\start.ps1 -Council -Online -ResearchUrls "https://example.com,https://example.org" -Prompt "..."
 
+# DDG search + safe fetch before Round 1 (search -> URL list -> fetch + cache)
+.\start.ps1 -Council -Online -ResearchQuery "2026 agent frameworks best practices" -ResearchMaxResults 8 -Prompt "..."
+
 # Optional: fail the whole run if it scores below a threshold (useful for unattended runs)
 .\start.ps1 -Council -FailClosedOnThreshold -Threshold 70 -Prompt "..."
 ```

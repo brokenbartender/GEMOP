@@ -88,6 +88,9 @@ param(
   # New: optional web research ingestion (safe URL fetch only) before Round 1.
   [string]$ResearchUrls = "",
   [string]$ResearchUrlsFile = "",
+  [string]$ResearchQuery = "",
+  [string]$ResearchQueryFile = "",
+  [int]$ResearchMaxResults = 8,
 
   # New: extract structured decisions from agent outputs and optionally require them.
   [switch]$ExtractDecisions,
@@ -540,6 +543,70 @@ function Read-JsonOrNull([string]$Path) {
   }
 }
 
+function Build-TargetFileContext {
+  param(
+    [string]$RepoRoot,
+    [string]$RunDir,
+    [int]$RoundNumber,
+    [int]$AgentId,
+    [int]$CharBudget = 20000
+  )
+
+  # Only useful for implementation rounds: show current contents of files the agent
+  # said it would touch in the previous round's DECISION_JSON.
+  if ($RoundNumber -lt 3) { return "" }
+
+  $prevRound = $RoundNumber - 1
+  $dp = Join-Path $RunDir ("state\\decisions\\round{0}_agent{1}.json" -f $prevRound, $AgentId)
+  $obj = Read-JsonOrNull -Path $dp
+  if (-not $obj) { return "" }
+  if (-not $obj.files) { return "" }
+
+  $buf = New-Object System.Text.StringBuilder
+  [void]$buf.Append("[TARGET FILE SNAPSHOTS]`r`nThese are the current repo contents for files you declared in the previous round. Use these exact contents to produce git-applyable diffs. If a file is missing, treat it as a new file to create.`r`n`r`n")
+
+  $used = 0
+  foreach ($f in $obj.files) {
+    if ([string]::IsNullOrWhiteSpace([string]$f)) { continue }
+    $rel = ([string]$f).Replace("\\","/").Trim()
+    $abs = Join-Path $RepoRoot $rel
+    if (-not (Test-Path -LiteralPath $abs)) {
+      [void]$buf.Append("### $rel (missing)`r`n`r`n")
+      $used += (6 + $rel.Length)
+      if ($used -ge $CharBudget) { break }
+      continue
+    }
+    $txt = Read-Text $abs
+    if ([string]::IsNullOrWhiteSpace($txt)) { $txt = "" }
+
+    # Keep per-file snippets bounded; large files overwhelm prompts and reduce quality.
+    $maxPer = 6000
+    if ($txt.Length -gt $maxPer) { $txt = $txt.Substring(0, $maxPer) + "`r`n...[truncated]`r`n" }
+
+    $lang = "text"
+    if ($rel.EndsWith(".py")) { $lang = "python" }
+    elseif ($rel.EndsWith(".ps1")) { $lang = "powershell" }
+    elseif ($rel.EndsWith(".md")) { $lang = "markdown" }
+    elseif ($rel.EndsWith(".json")) { $lang = "json" }
+    elseif ($rel.EndsWith(".toml")) { $lang = "toml" }
+
+    # Use ~~~ fences (not ```) to avoid PowerShell backtick escaping pitfalls.
+    $chunk = @"
+### $rel
+~~~$lang
+$txt
+~~~
+"@.Trim()
+    if (($used + $chunk.Length) -gt $CharBudget) { break }
+    [void]$buf.Append($chunk + "`r`n`r`n")
+    $used += $chunk.Length
+  }
+
+  $out = $buf.ToString()
+  if ($out.Length -gt $CharBudget) { $out = $out.Substring(0, $CharBudget) }
+  return $out.Trim() + "`r`n`r`n"
+}
+
 function Get-CloudCallsRemaining([string]$RunDir) {
   try {
     $p = Join-Path $RunDir "state\\quota.json"
@@ -681,6 +748,33 @@ $task
   Set-Content -LiteralPath $p -Value $body -Encoding UTF8
 }
 
+function Ensure-RepoIndex {
+  param(
+    [string]$RepoRoot,
+    [string]$RunDir
+  )
+
+  try {
+    $stateDir = Join-Path $RunDir "state"
+    Ensure-Dir $stateDir
+    $outMd = Join-Path $stateDir "repo_index.md"
+    $outJson = Join-Path $stateDir "repo_index.json"
+
+    if (Test-Path -LiteralPath $outMd) {
+      try {
+        $len = (Get-Item -LiteralPath $outMd).Length
+        if ($len -ge 800) { return }
+      } catch { return }
+    }
+
+    $idx = Join-Path $RepoRoot "scripts\\repo_index.py"
+    if (-not (Test-Path -LiteralPath $idx)) { return }
+
+    & python $idx --repo-root $RepoRoot --out-md $outMd --out-json $outJson --max-files 2200 | Out-Null
+    try { Write-OrchLog -RunDir $RunDir -Msg ("repo_index_written out={0}" -f $outMd) } catch { }
+  } catch { }
+}
+
 function Ensure-SkillPack {
   param(
     [string]$RepoRoot,
@@ -798,6 +892,9 @@ function Generate-RunScaffold {
     $task = "No prompt provided."
   }
 
+  # Generate once per run: an authoritative index of repo files that agents may cite as existing.
+  Ensure-RepoIndex -RepoRoot $RepoRoot -RunDir $RunDir
+
   $lessons = ""
   if ($InjectLearningHints) {
     $lessonsPath = Join-Path $RepoRoot "ramshare\\learning\\memory\\lessons.md"
@@ -847,6 +944,12 @@ function Generate-RunScaffold {
     $anchor = Read-Text (Join-Path $RunDir "state\\mission_anchor.md")
     if ($anchor) { $anchor = $anchor.Trim() + "`r`n`r`n" }
 
+    $repoIndex = Read-Text (Join-Path $RunDir "state\\repo_index.md")
+    if ($repoIndex) {
+      if ($repoIndex.Length -gt 12000) { $repoIndex = $repoIndex.Substring(0, 12000) }
+      $repoIndex = "[REPO FILE INDEX - AUTHORITATIVE]`r`n$repoIndex`r`n`r`n"
+    }
+
     $world = Read-Text (Join-Path $RunDir "state\\world_state.md")
     if ($world) {
       if ($world.Length -gt 2500) { $world = $world.Substring([Math]::Max(0, $world.Length - 2500)) }
@@ -867,7 +970,7 @@ function Generate-RunScaffold {
 
     $sources = Read-Text (Join-Path $RunDir "state\\sources.md")
     if ($sources) {
-      if ($sources.Length -gt 4000) { $sources = $sources.Substring(0, 4000) }
+      if ($sources.Length -gt 8000) { $sources = $sources.Substring(0, 8000) }
       $sources = "[RESEARCH SOURCES - FETCHED]`r`n$sources`r`n`r`n"
     }
 
@@ -954,9 +1057,11 @@ $pt
 
     $roundTask = $task
     if ($CouncilPattern -eq "debate" -and $RoundNumber -eq 1) {
-      $roundTask = "DEBATE & DESIGN: $task. Propose concrete code changes grounded in repo evidence."
-    } elseif ($CouncilPattern -eq "debate" -and $RoundNumber -ge 2) {
-      $roundTask = "ACTUATE & IMPLEMENT: $task. Apply concrete changes. Include verification commands."
+      $roundTask = "RESEARCH: $task. Extract must-haves with citations from RESEARCH SOURCES. Do not invent repo file paths; only cite paths from REPO FILE INDEX."
+    } elseif ($CouncilPattern -eq "debate" -and $RoundNumber -eq 2) {
+      $roundTask = "DESIGN: $task. Map must-haves to minimal repo changes. Output a valid DECISION_JSON with files you intend to touch and verification commands. Avoid diffs in this round."
+    } elseif ($CouncilPattern -eq "debate" -and $RoundNumber -ge 3) {
+      $roundTask = "IMPLEMENT: $task. Produce git-applyable unified diffs for the planned changes, restricted to allowed paths. Prefer `diff --git a/... b/...` format (like `git diff`). Do not put prose inside ```diff blocks. Ensure DECISION_JSON.files lists every file touched by your diffs. Include verification commands."
     }
 
     $onto = ""
@@ -973,29 +1078,48 @@ $pt
       $misinfo = "[TRUSTED MEMO - MAY BE WRONG; VERIFY]`r`n$MisinformText`r`n`r`n"
     }
 
+    $roleGuidance = ""
+    switch ($role) {
+      "ResearchLead" { $roleGuidance = "Focus: extract must-haves with citations from sources.md. No fake file paths." }
+      "Engineer" { $roleGuidance = "Focus: implement minimal diffs under scripts/docs/configs/mcp. Output diffs that `git apply` will accept (prefer diff --git a/... b/... headers; complete hunks with @@ lines; no prose inside diff fences)." }
+      "Tester" { $roleGuidance = "Focus: verification commands and failure modes. Challenge invalid assumptions." }
+      "Critic" { $roleGuidance = "Focus: attack hallucinations (invalid file refs, fake citations) and simplify scope." }
+      "Security" { $roleGuidance = "Focus: tool safety, allowlists, and preventing prompt injection/exfiltration." }
+      default { $roleGuidance = "Focus: repo-grounded improvements; prefer minimal, testable changes." }
+    }
+
+    $decisionLine = "- Include a `DECISION_JSON` block (optional in Round 1; required in Round 2+)."
+
+    $targetFiles = ""
+    try {
+      $targetFiles = Build-TargetFileContext -RepoRoot $RepoRoot -RunDir $RunDir -RoundNumber $RoundNumber -AgentId $i -CharBudget 20000
+    } catch { $targetFiles = "" }
+
     $body = @"
- $facts$retrieval$world$sources$skills$anchor$lessons$header
+ $facts$repoIndex$targetFiles$retrieval$world$sources$skills$anchor$lessons$header
  $cap$supervisorMemo$ownerBlock$onto$misinfo$adv$poison
  [OPERATIONAL CONTEXT]
- REPO_ROOT: $RepoRoot
-RUN_DIR: $RunDir
+  REPO_ROOT: $RepoRoot
+ RUN_DIR: $RunDir
 COUNCIL_PATTERN: $CouncilPattern
 ROUND: $RoundNumber
 
 [ROLE]
 You are Agent $i. Role: $role
+ROLE_GUIDANCE: $roleGuidance
 
 [TASK]
 $roundTask
 
  [OUTPUT CONTRACT]
- - Cite exact repo file paths.
- - Include at least one verification command.
+ - Cite exact repo file paths (only from REPO FILE INDEX unless you are creating a new file via a diff).
+ - Include at least one verification command (Round 3+ must be runnable).
  - If you need additional procedural playbooks from the local skill libraries, request them for the next round by adding:
    ```json SKILL_REQUEST_JSON
    {"skills":["playwright","security-best-practices"],"reason":"why you need them"}
    ```
- - Include a `DECISION_JSON` block:
+ $decisionLine
+ - Use this schema:
    ```json DECISION_JSON
    {"summary":"...","files":["..."],"commands":["..."],"risks":["..."],"confidence":0.0}
    ```
@@ -1641,6 +1765,48 @@ if ($existingRunnerScripts -and $existingRunnerScripts.Count -gt 0) {
       break
     }
 
+    # Optional: ingest safe URL sources for agents before the first round.
+    # Supports:
+    # - explicit URLs via -ResearchUrls / -ResearchUrlsFile
+    # - DDG search -> URLs -> fetch via -ResearchQuery / -ResearchQueryFile
+    if ($r -eq 1 -and ($Online) -and (
+        (-not [string]::IsNullOrWhiteSpace($ResearchUrls)) -or
+        (-not [string]::IsNullOrWhiteSpace($ResearchUrlsFile)) -or
+        (-not [string]::IsNullOrWhiteSpace($ResearchQuery)) -or
+        (-not [string]::IsNullOrWhiteSpace($ResearchQueryFile))
+      )) {
+      try {
+        $fetch = Join-Path $RepoRoot "scripts\\web_research_fetch.py"
+        $search = Join-Path $RepoRoot "scripts\\web_research_search.py"
+        $wa = @("--run-dir",$RunDir)
+
+        $useUrls = (-not [string]::IsNullOrWhiteSpace($ResearchUrls)) -or (-not [string]::IsNullOrWhiteSpace($ResearchUrlsFile))
+        if (-not $useUrls) {
+          # Generate a URL file from search query (DDG) so fetch stays deterministic/cached.
+          if (Test-Path -LiteralPath $search) {
+            $sa = @("--run-dir",$RunDir, "--max","$ResearchMaxResults")
+            if ($ResearchQuery) { $sa += @("--query",$ResearchQuery) }
+            if ($ResearchQueryFile) { $sa += @("--query-file",$ResearchQueryFile) }
+            & python $search @sa | Out-Null
+            $ResearchUrlsFile = "state\\research_urls.txt"
+            $useUrls = $true
+            Write-OrchLog -RunDir $RunDir -Msg ("web_research_search ok max_results={0}" -f $ResearchMaxResults)
+          } else {
+            Write-OrchLog -RunDir $RunDir -Msg "web_research_search missing"
+          }
+        }
+
+        if ($useUrls -and (Test-Path -LiteralPath $fetch)) {
+          if ($ResearchUrls) { $wa += @("--urls",$ResearchUrls) }
+          if ($ResearchUrlsFile) { $wa += @("--urls-file",$ResearchUrlsFile) }
+          & python $fetch @wa | Out-Null
+          Write-OrchLog -RunDir $RunDir -Msg "web_research_fetched ok"
+        }
+      } catch {
+        Write-OrchLog -RunDir $RunDir -Msg ("web_research_fetch_failed error={0}" -f $_.Exception.Message)
+      }
+    }
+
     if ($BlackoutAtRound -gt 0 -and $r -eq $BlackoutAtRound) {
       $b = Invoke-Blackout -RunDir $RunDir -AgentCount $agentCount -DisconnectPct $BlackoutDisconnectPct -WipePct $BlackoutWipePct -Seed $Seed
       try {
@@ -1731,17 +1897,56 @@ if ($existingRunnerScripts -and $existingRunnerScripts.Count -gt 0) {
         }
       }
     } catch { }
+
+    # Dynamic skipping: if an agent still failed to produce a usable round output, skip it in subsequent rounds
+    # to avoid long contract repairs and stalled runs.
+    try {
+      $minRemain = [Math]::Max(2, [int]$BusQuorum)
+      for ($ai = 1; $ai -le $agentCount; $ai++) {
+        if ($skipAgentIds -and ($skipAgentIds -contains $ai)) { continue }
+        $op = Join-Path $RunDir ("round{0}_agent{1}.md" -f $r, $ai)
+        $bad = $false
+        if (-not (Test-Path -LiteralPath $op)) { $bad = $true }
+        else {
+          try {
+            $len = (Get-Item -LiteralPath $op).Length
+            if ($len -lt 200) { $bad = $true }
+          } catch { $bad = $true }
+        }
+        if ($bad) {
+          $remaining = [int]$agentCount - [int](@($skipAgentIds).Count + 1)
+          if ($remaining -ge $minRemain) {
+            $skipAgentIds += [int]$ai
+            $skipAgentIds = @($skipAgentIds | Sort-Object -Unique)
+            Write-OrchLog -RunDir $RunDir -Msg ("dynamic_skip agent={0} round={1} reason=missing_or_short_output" -f $ai, $r)
+          }
+        }
+      }
+    } catch { }
     Write-Log "round $r complete"
     Write-OrchLog -RunDir $RunDir -Msg "round_complete round=$r"
     try { Append-LifecycleEvent -RunDir $RunDir -Event "round_complete" -RoundNumber $r -AgentId 0 -Details @{} } catch { }
     try { Update-RunLedgerRoundEvent -RunDir $RunDir -RoundNumber $r -Event "complete" } catch { }
 
     if ($ExtractDecisions -or $RequireDecisionJson) {
+      # Round 1 is typically "analysis/research" and often should not be forced to emit DECISION_JSON.
+      # Enforce required decisions only from round 2 onward (implementation rounds), otherwise we risk
+      # disabling auto-apply before it ever gets a chance to run.
+      $requireDecisionThisRound = ($RequireDecisionJson -and ($r -ge 2))
       try {
         $ed = Join-Path $RepoRoot "scripts\\extract_agent_decisions.py"
         if (Test-Path -LiteralPath $ed) {
+          # If some agents timed out or were skipped, do not require decisions from them.
+          $activeAgents = @()
+          for ($ai = 1; $ai -le $agentCount; $ai++) {
+            if ($skipAgentIds -and ($skipAgentIds -contains $ai)) { continue }
+            $activeAgents += $ai
+          }
+          $agentsCsv = (@($activeAgents) -join ",")
+
           $ea = @("--run-dir",$RunDir,"--round",$r,"--agent-count",$agentCount)
-          if ($RequireDecisionJson) { $ea += "--require" }
+          if ($agentsCsv) { $ea += @("--agents",$agentsCsv) }
+          if ($requireDecisionThisRound) { $ea += "--require" }
 
           $missing = @()
           $invalid = @()
@@ -1762,7 +1967,11 @@ if ($existingRunnerScripts -and $existingRunnerScripts.Count -gt 0) {
           }
 
           # Self-heal: if DECISION_JSON is required but missing, re-run only the failing seats with a repair prompt.
-          if ($RequireDecisionJson -and $rc -ne 0 -and $ContractRepairAttempts -gt 0 -and $missing.Count -gt 0) {
+          # Do not attempt repairs for agents that were already skipped.
+          if ($requireDecisionThisRound -and $rc -ne 0 -and $ContractRepairAttempts -gt 0 -and $missing.Count -gt 0) {
+            if ($skipAgentIds -and $skipAgentIds.Count -gt 0) {
+              $missing = @($missing | Where-Object { -not ($skipAgentIds -contains [int]$_) })
+            }
             for ($attempt = 1; $attempt -le $ContractRepairAttempts; $attempt++) {
               if (Test-StopRequested -RepoRoot $RepoRoot -RunDir $RunDir) { break }
               if (-not $missing -or $missing.Count -eq 0) { break }
@@ -1795,7 +2004,7 @@ if ($existingRunnerScripts -and $existingRunnerScripts.Count -gt 0) {
             }
           }
 
-          if ($RequireDecisionJson -and $rc -ne 0) {
+          if ($requireDecisionThisRound -and $rc -ne 0) {
             throw ("extract_agent_decisions failed round={0} missing={1}" -f $r, (@($missing) -join ","))
           }
           Write-OrchLog -RunDir $RunDir -Msg ("decisions_extracted round={0}" -f $r)
@@ -1804,8 +2013,11 @@ if ($existingRunnerScripts -and $existingRunnerScripts.Count -gt 0) {
       } catch {
         Write-OrchLog -RunDir $RunDir -Msg ("decisions_extract_failed round={0} error={1}" -f $r, $_.Exception.Message)
         try { Append-LifecycleEvent -RunDir $RunDir -Event "decisions_extract_failed" -RoundNumber $r -AgentId 0 -Details @{ error = $_.Exception.Message } } catch { }
-        if ($RequireDecisionJson) {
-          Write-StopRequested -RepoRoot $RepoRoot -RunDir $RunDir -Reason ("missing_decisions round={0}" -f $r)
+        if ($requireDecisionThisRound) {
+          # Degrade gracefully: missing DECISION_JSON should not brick the entire run via global STOP flags.
+          # Auto-apply for THIS round is unsafe without declared touched files, but do not permanently
+          # disable auto-apply for later rounds (Round 1 commonly has no decisions by design).
+          Write-OrchLog -RunDir $RunDir -Msg ("decisions_missing_nonfatal round={0} skipping_auto_apply_this_round" -f $r)
         }
       }
     }
@@ -1872,7 +2084,14 @@ if ($existingRunnerScripts -and $existingRunnerScripts.Count -gt 0) {
     }
 
   # Optional: auto-apply diffs produced by the highest-integrity agent in implementation rounds.
-  if ($AutoApplyPatches -and $r -ge 2) {
+  # Auto-apply is most effective on the final implementation round.
+  # (Debate runs often have "design" rounds with no diffs; attempting to apply there wastes cycles.)
+  $autoApplyThisRound = $AutoApplyPatches -and ($r -ge 2)
+  if ($CouncilPattern -eq "debate" -and $r -lt $MaxRounds -and -not $env:GEMINI_OP_AUTOAPPLY_EACH_ROUND) {
+    $autoApplyThisRound = $false
+  }
+
+  if ($autoApplyThisRound -and $r -ge 2) {
       try {
         # Ensure decisions exist for the chosen agent so patch-apply can enforce declared touched files.
         try {
@@ -1884,7 +2103,16 @@ if ($existingRunnerScripts -and $existingRunnerScripts.Count -gt 0) {
         } catch { }
 
         $cpa = Join-Path $RepoRoot "scripts\\council_patch_apply.py"
-        $cpaArgs = @($cpa,"--repo-root",$RepoRoot,"--run-dir",$RunDir,"--round",$r,"--require-decision-files","--require-diff-blocks","--verify")
+        $cpaArgs = @(
+          $cpa,
+          "--repo-root",$RepoRoot,
+          "--run-dir",$RunDir,
+          "--round",$r,
+          "--require-decision-files",
+          "--infer-decision-files",
+          "--require-diff-blocks",
+          "--verify"
+        )
         if ($RequireApproval) { $cpaArgs += "--require-approval" }
         if ($RequireGrounding) { $cpaArgs += "--require-grounding" }
         try { Append-LifecycleEvent -RunDir $RunDir -Event "auto_apply_patches_start" -RoundNumber $r -AgentId 0 -Details @{ require_approval = [bool]$RequireApproval; require_grounding = [bool]$RequireGrounding } } catch { }
@@ -1894,7 +2122,8 @@ if ($existingRunnerScripts -and $existingRunnerScripts.Count -gt 0) {
       } catch {
         Write-OrchLog -RunDir $RunDir -Msg ("auto_apply_patches_failed round={0} error={1}" -f $r, $_.Exception.Message)
         try { Append-LifecycleEvent -RunDir $RunDir -Event "auto_apply_patches_failed" -RoundNumber $r -AgentId 0 -Details @{ error = $_.Exception.Message } } catch { }
-        Write-StopRequested -RepoRoot $RepoRoot -RunDir $RunDir -Reason ("auto_apply_patches_failed round={0}" -f $r)
+        # Non-fatal: patch-apply is best-effort. If a diff is rejected (ex: disallowed paths), do not kill the run.
+        # This prevents "stuck STOP" situations where a single bad diff blocks future runs.
       }
     }
 
@@ -1964,9 +2193,32 @@ if (Test-StopRequested -RepoRoot $RepoRoot -RunDir $RunDir) {
 }
 
 $summary = Write-LearningSummary -RepoRoot $RepoRoot -RunDir $RunDir
-$avg = [double]$summary.avg_score
-Write-Log ("avg_score={0} threshold={1}" -f $avg, $Threshold)
-Write-OrchLog -RunDir $RunDir -Msg ("score avg_score={0} threshold={1}" -f $avg, $Threshold)
+
+# The learning summary score is not the same as supervisor scoring and can be much lower.
+# Compute a supervisor average (last available round) to avoid confusing logs.
+$learningAvg = 0.0
+try { $learningAvg = [double]$summary.avg_score } catch { $learningAvg = 0.0 }
+
+$supervisorAvg = $null
+try {
+  $supLatest = Get-ChildItem -LiteralPath (Join-Path $RunDir "state") -Filter "supervisor_round*.json" -File -ErrorAction SilentlyContinue |
+    Sort-Object Name | Select-Object -Last 1
+  if ($supLatest) {
+    $supObj = Get-Content -LiteralPath $supLatest.FullName -Raw -ErrorAction SilentlyContinue | ConvertFrom-Json
+    if ($supObj -and $supObj.verdicts) {
+      $scores = @()
+      foreach ($v in $supObj.verdicts) {
+        try { $scores += [double]$v.score } catch { }
+      }
+      if ($scores.Count -gt 0) { $supervisorAvg = ($scores | Measure-Object -Average).Average }
+    }
+  }
+} catch { $supervisorAvg = $null }
+
+$finalAvg = if ($null -ne $supervisorAvg) { [double]$supervisorAvg } else { [double]$learningAvg }
+
+Write-Log ("final_avg_score={0} supervisor_avg_score={1} learning_avg_score={2} threshold={3}" -f $finalAvg, $supervisorAvg, $learningAvg, $Threshold)
+Write-OrchLog -RunDir $RunDir -Msg ("score final_avg_score={0} supervisor_avg_score={1} learning_avg_score={2} threshold={3}" -f $finalAvg, $supervisorAvg, $learningAvg, $Threshold)
 
 if ($AutoTuneFromLearning -and $EnableCouncilBus) {
   try {
@@ -1977,31 +2229,15 @@ if ($AutoTuneFromLearning -and $EnableCouncilBus) {
   }
 }
 
-if ($FailClosedOnThreshold -and ($avg -lt $Threshold)) {
+if ($FailClosedOnThreshold -and ($finalAvg -lt $Threshold)) {
   Write-Log "FAIL (threshold)"
   Write-OrchLog -RunDir $RunDir -Msg "exit fail_threshold"
   exit 1
 }
 
 Write-Log "OK"
-Write-OrchLog -RunDir $RunDir -Msg "exit ok"
-exit 0
-
-    # Optional: ingest safe URL sources for agents before the first round.
-    if ($r -eq 1 -and $Online -and (-not [string]::IsNullOrWhiteSpace($ResearchUrls) -or -not [string]::IsNullOrWhiteSpace($ResearchUrlsFile))) {
-      try {
-        $fetch = Join-Path $RepoRoot "scripts\\web_research_fetch.py"
-        if (Test-Path -LiteralPath $fetch) {
-          $wa = @("--run-dir",$RunDir)
-          if ($ResearchUrls) { $wa += @("--urls",$ResearchUrls) }
-          if ($ResearchUrlsFile) { $wa += @("--urls-file",$ResearchUrlsFile) }
-          & python $fetch @wa | Out-Null
-          Write-OrchLog -RunDir $RunDir -Msg "web_research_fetched ok"
-        }
-      } catch {
-        Write-OrchLog -RunDir $RunDir -Msg ("web_research_fetch_failed error={0}" -f $_.Exception.Message)
-      }
-    }
+  Write-OrchLog -RunDir $RunDir -Msg "exit ok"
+  exit 0
 
     # Optional: adaptive concurrency based on prior metrics (conservative reductions only).
     if ($AdaptiveConcurrency -and $r -ge 2) {

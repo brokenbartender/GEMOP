@@ -646,6 +646,8 @@ def _pid_alive_windows(pid: int) -> bool:
             ["tasklist", "/FI", f"PID eq {int(pid)}", "/FO", "CSV", "/NH"],
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             timeout=2,
         )
         out = (cp.stdout or "").strip()

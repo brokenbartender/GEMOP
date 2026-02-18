@@ -26,7 +26,7 @@ STOP_FLAG = REPO_ROOT / "ramshare" / "state" / "STOP"
 
 SELF_LEARNER = REPO_ROOT / "scripts" / "agent_self_learning.py"
 COUNCIL_LEARNER = REPO_ROOT / "scripts" / "council_reflection_learner.py"
-MEMORY_SCRIPT = REPO_ROOT / "scripts" / "GEMINI_memory.py"
+MEMORY_SCRIPT = REPO_ROOT / "scripts" / "gemini_memory.py"
 MEMORY_INGEST_PS1 = REPO_ROOT / "scripts" / "memory-ingest.ps1"
 MEMORY_URL = "http://localhost:3013/mcp"
 
@@ -41,7 +41,14 @@ def today_hhmm(ts: Optional[dt.datetime] = None) -> str:
 
 
 def run_cmd(args: List[str], cwd: Optional[Path] = None) -> Dict[str, Any]:
-    proc = subprocess.run(args, cwd=str(cwd or REPO_ROOT), capture_output=True, text=True)
+    proc = subprocess.run(
+        args,
+        cwd=str(cwd or REPO_ROOT),
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
     return {
         "cmd": args,
         "returncode": proc.returncode,

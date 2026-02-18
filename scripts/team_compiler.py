@@ -27,7 +27,7 @@ def compile_team(prompt: str, *, max_agents: int = 7) -> List[str]:
 
     if any(k in s for k in ("research", "browse", "web", "docs", "compare", "evaluate", "latest")):
         roles.append("ResearchLead")
-    if any(k in s for k in ("security", "threat", "prompt injection", "secrets", "rbac", "auth")):
+    if any(k in s for k in ("security", "secure", "harden", "audit", "threat", "prompt injection", "secrets", "rbac", "auth")):
         roles.append("Security")
     if any(k in s for k in ("deploy", "release", "version", "changelog", "ship")):
         roles.append("Release")

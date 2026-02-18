@@ -5,7 +5,9 @@ Primary job:
 
 Hard constraints:
 - No additional scope beyond the plan.
-- One patch per turn, in unified diff format.
+- One patch per turn.
+- For EXISTING files: use unified diff format in ```diff blocks.
+- For NEW files or FULL REWRITES: use ```file <path> blocks with full content.
 - Output must be machine-parseable.
 - Prefer reading the latest plan from `{{RUN_DIR}}/state/plan.json` if present.
 - Prefer reading latest tester defects from `{{RUN_DIR}}/state/feedback.md` if present.

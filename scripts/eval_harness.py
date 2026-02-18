@@ -36,6 +36,8 @@ class RunScore:
     verify_ok: Optional[bool]
     local_overload_hits: int
     ollama_timeouts: int
+    injection_hits: int
+    refusal_hits: int
 
 
 def _parse_manifest(run_dir: Path) -> Tuple[Optional[bool], Optional[int], float]:
@@ -95,13 +97,17 @@ def _latest_verify_ok(run_dir: Path) -> Optional[bool]:
     return None
 
 
-def _count_fail_signals(run_dir: Path) -> Tuple[int, int]:
-    """Returns (local_overload_hits, ollama_timeouts)."""
-    metrics = run_dir / "state" / "agent_metrics.jsonl"
+def _count_fail_signals(run_dir: Path) -> Tuple[int, int, int, int]:
+    """Returns (local_overload_hits, ollama_timeouts, injection_hits, refusal_hits)."""
+    metrics_file = run_dir / "state" / "agent_metrics.jsonl"
+
+    total_injection_hits = 0
+    total_refusal_hits = 0
+
     local_overload = 0
     ollama_timeouts = 0
-    if metrics.exists():
-        for ln in _read_text(metrics, limit=2_000_000).splitlines():
+    if metrics_file.exists():
+        for ln in _read_text(metrics_file, limit=2_000_000).splitlines():
             ln = ln.strip()
             if not ln:
                 continue
@@ -109,6 +115,10 @@ def _count_fail_signals(run_dir: Path) -> Tuple[int, int]:
                 row = json.loads(ln)
             except Exception:
                 continue
+
+            if not isinstance(row, dict):
+                continue
+
             if not isinstance(row, dict):
                 continue
             # These strings are emitted in local_call() messages.
@@ -119,11 +129,19 @@ def _count_fail_signals(run_dir: Path) -> Tuple[int, int]:
                     body = _read_text(op, limit=50_000)
                     if "LOCAL_OVERLOAD:" in body:
                         local_overload += 1
+
+            # Extract specific metrics from the 'metrics' sub-dictionary
+            agent_metrics = row.get("metrics", {})
+            if isinstance(agent_metrics, dict):
+                total_injection_hits += agent_metrics.get("injection_hits", 0)
+                total_refusal_hits += agent_metrics.get("refusal_hits", 0)
+
     # Agent runner debug log also contains raw ollama timeout lines.
-    dbg = Path("logs") / "agent_runner_debug.log"
+    # This log is often global, so filtering by run_dir.name is crucial.
+    dbg_log_path = Path("logs") / "agent_runner_debug.log"
     try:
-        if dbg.exists():
-            txt = _read_text(dbg, limit=3_000_000)
+        if dbg_log_path.exists():
+            txt = _read_text(dbg_log_path, limit=3_000_000)
             # Very rough: count occurrences that mention run_dir name to avoid cross-run inflation.
             tag = run_dir.name
             for ln in txt.splitlines():
@@ -133,7 +151,7 @@ def _count_fail_signals(run_dir: Path) -> Tuple[int, int]:
                     ollama_timeouts += 1
     except Exception:
         pass
-    return local_overload, ollama_timeouts
+    return local_overload, ollama_timeouts, total_injection_hits, total_refusal_hits
 
 
 def score_run(run_dir: Path) -> RunScore:
@@ -141,7 +159,7 @@ def score_run(run_dir: Path) -> RunScore:
     rounds_seen, missing_total = _count_decision_missing(run_dir)
     patch_ok = _latest_patch_apply(run_dir)
     verify_ok = _latest_verify_ok(run_dir)
-    local_overload, ollama_timeouts = _count_fail_signals(run_dir)
+    local_overload, ollama_timeouts, injection_hits, refusal_hits = _count_fail_signals(run_dir)
     return RunScore(
         run_dir=str(run_dir),
         created_at=created_at,
@@ -151,6 +169,8 @@ def score_run(run_dir: Path) -> RunScore:
         decision_missing_total=missing_total,
         patch_apply_ok=patch_ok,
         verify_ok=verify_ok,
+        injection_hits=injection_hits,
+        refusal_hits=refusal_hits,
         local_overload_hits=local_overload,
         ollama_timeouts=ollama_timeouts,
     )
@@ -199,4 +219,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

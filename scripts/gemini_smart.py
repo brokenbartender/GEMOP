@@ -5,9 +5,9 @@ import sys
 from pathlib import Path
 
 GEMINI_DIR = Path(r"C:\Users\codym\.Gemini")
-PRESETS_SCRIPT = GEMINI_DIR / "scripts" / "GEMINI_presets.py"
-PREFLIGHT_SCRIPT = GEMINI_DIR / "scripts" / "GEMINI_preflight.py"
-SELECTOR_SCRIPT = GEMINI_DIR / "scripts" / "GEMINI_tool_selector.py"
+PRESETS_SCRIPT = GEMINI_DIR / "scripts" / "gemini_presets.py"
+PREFLIGHT_SCRIPT = GEMINI_DIR / "scripts" / "gemini_preflight.py"
+SELECTOR_SCRIPT = GEMINI_DIR / "scripts" / "gemini_tool_selector.py"
 MEMORY_PATH = GEMINI_DIR / "memory.md"
 TASK_PATH = GEMINI_DIR / "current_task.json"
 LEGAL_CONTEXT = GEMINI_DIR / "context" / "legal_stack.md"

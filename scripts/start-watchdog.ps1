@@ -9,10 +9,11 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-$py = 'C:\Gemini\.venv\Scripts\python.exe'
-$script = 'C:\Gemini\scripts\GEMINI_watchdog.py'
-$logDir = 'C:\Gemini\logs'
-$stateDir = 'C:\Gemini\ramshare\state'
+$RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+$py = 'python'
+$script = (Join-Path $RepoRoot 'scripts\gemini_watchdog.py')
+$logDir = (Join-Path $RepoRoot 'logs')
+$stateDir = (Join-Path $RepoRoot 'ramshare\state')
 if (!(Test-Path $logDir)) { New-Item -ItemType Directory -Force -Path $logDir | Out-Null }
 if (!(Test-Path $stateDir)) { New-Item -ItemType Directory -Force -Path $stateDir | Out-Null }
 $pidFile = Join-Path $stateDir ("watchdog.{0}.pid" -f $Profile)
@@ -33,7 +34,7 @@ if (Test-Path $pidFile) {
 $procs = Get-CimInstance Win32_Process -Filter "Name='python.exe' OR Name='pythonw.exe'" -ErrorAction SilentlyContinue
 foreach ($p in $procs) {
   $cmd = [string]$p.CommandLine
-  if ($cmd -and ($cmd -like "*GEMINI_watchdog.py*") -and ($cmd -like "*--profile $Profile*")) {
+  if ($cmd -and ($cmd -like "*gemini_watchdog.py*") -and ($cmd -like "*--profile $Profile*")) {
     Set-Content -Path $pidFile -Value $p.ProcessId -Encoding ASCII
     Write-Host "Watchdog already running for profile=$Profile (pid=$($p.ProcessId))"
     exit 0

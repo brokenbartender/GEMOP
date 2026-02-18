@@ -67,8 +67,8 @@ if ($Profile -in @('browser','research','fidelity','full')) {
   if (!(Test-Path $dataDir)) { New-Item -ItemType Directory -Force -Path $dataDir | Out-Null }
   $memoryFile = Join-Path $dataDir 'memory.jsonl'
 
-  # Corrected Quoting using doubled double-quotes for PowerShell strings
-  $memoryArgs = @('/c', "node ""$proxyScript"" --command mcp-server-memory --name memory --port 3013 --endpoint /mcp --env MEMORY_FILE_PATH=""$memoryFile""")
+  # Use pinkpixel memory server for better reliability
+  $memoryArgs = @('/c', "node ""$proxyScript"" --command npx --name memory --port 3013 --endpoint /mcp --args ""-y @pinkpixel/memory-mcp@latest"" --env MEMORY_FILE_PATH=""$memoryFile""")
   Ensure-ProcessOnPort -Port 3013 -Name 'memory' `
     -FilePath 'cmd.exe' `
     -ArgumentList $memoryArgs `
@@ -88,7 +88,9 @@ if ($Profile -in @('browser','research','fidelity','full')) {
     $fastembedCache = Join-Path $dataDir 'fastembed_cache'
     if (!(Test-Path $fastembedCache)) { New-Item -ItemType Directory -Force -Path $fastembedCache | Out-Null }
 
-    $searchArgs = @('/c', "node ""$proxyScript"" --command ""$py"" --name semantic-search --port 3014 --endpoint /mcp --args ""-m semantic_search_mcp.server"" --env FASTEMBED_CACHE_PATH=""$fastembedCache""")
+    # Use local shim for semantic search
+    $shimPath = Join-Path $PSScriptRoot "mcp\semantic_server.py"
+    $searchArgs = @('/c', "node ""$proxyScript"" --command ""$py"" --name semantic-search --port 3014 --endpoint /mcp --args ""$shimPath"" --env FASTEMBED_CACHE_PATH=""$fastembedCache""")
     Ensure-ProcessOnPort -Port 3014 -Name 'semantic-search' `
       -FilePath 'cmd.exe' `
       -ArgumentList $searchArgs `

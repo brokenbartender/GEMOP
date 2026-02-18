@@ -109,6 +109,12 @@ def validate_decision(obj: dict[str, Any], *, round_n: int) -> list[str]:
             if k == "files" and _is_suspicious_path(item):
                 errs.append(f"files[{i}]_invalid_path")
 
+    # Later rounds should propose concrete repo edits.
+    if int(round_n) >= 2:
+        files_v = obj.get("files") or []
+        if not isinstance(files_v, list) or len([x for x in files_v if isinstance(x, str) and x.strip()]) == 0:
+            errs.append("missing_files_round2plus")
+
     conf = obj.get("confidence", 0.0)
     if conf is None:
         conf = 0.0
@@ -120,11 +126,11 @@ def validate_decision(obj: dict[str, Any], *, round_n: int) -> list[str]:
         errs.append("confidence_not_number")
 
     # Round-aware expectations (lightweight):
-    # - later rounds should be more actionable.
-    if int(round_n) >= 2:
+    # - implementation rounds should include runnable verification commands.
+    if int(round_n) >= 3:
         cmds = obj.get("commands") or []
         if not isinstance(cmds, list) or len([x for x in cmds if isinstance(x, str) and x.strip()]) == 0:
-            errs.append("missing_commands_round2plus")
+            errs.append("missing_commands_round3plus")
 
     return errs
 
@@ -143,6 +149,7 @@ def main() -> int:
     ap.add_argument("--run-dir", required=True)
     ap.add_argument("--round", type=int, default=1)
     ap.add_argument("--agent-count", type=int, default=0)
+    ap.add_argument("--agents", default="", help="Optional comma-separated agent ids to consider (overrides agent-count inference).")
     ap.add_argument("--require", action="store_true", help="Fail if any participating agent has no decision JSON.")
     args = ap.parse_args()
 
@@ -152,17 +159,41 @@ def main() -> int:
     out_dir = state_dir / "decisions"
     out_dir.mkdir(parents=True, exist_ok=True)
 
+    agents: list[int] = []
+    if args.agents:
+        for part in str(args.agents).split(","):
+            part = (part or "").strip()
+            if not part:
+                continue
+            try:
+                agents.append(int(part))
+            except Exception:
+                continue
+        # Stable de-dupe preserving order.
+        seen = set()
+        agents2: list[int] = []
+        for a in agents:
+            if a <= 0 or a in seen:
+                continue
+            seen.add(a)
+            agents2.append(a)
+        agents = agents2
+
     agent_count = int(args.agent_count or 0)
-    if agent_count <= 0:
-        # Infer from prompt*.txt count.
-        agent_count = len(list(run_dir.glob("prompt*.txt")))
-    agent_count = max(1, agent_count)
+    if not agents:
+        if agent_count <= 0:
+            # Infer from prompt*.txt count.
+            agent_count = len(list(run_dir.glob("prompt*.txt")))
+        agent_count = max(1, agent_count)
+        agents = list(range(1, agent_count + 1))
+    else:
+        agent_count = len(agents)
 
     missing: list[int] = []
     invalid: list[int] = []
     invalid_reasons: dict[str, list[str]] = {}
     extracted = 0
-    for i in range(1, agent_count + 1):
+    for i in agents:
         md_path = run_dir / f"round{round_n}_agent{i}.md"
         if not md_path.exists():
             md_path = run_dir / f"agent{i}.md"
@@ -194,6 +225,7 @@ def main() -> int:
         "ok": (not missing and not invalid) or (not args.require),
         "round": round_n,
         "agent_count": agent_count,
+        "agents": agents,
         "extracted": extracted,
         "missing": missing,
         "invalid": invalid,

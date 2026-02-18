@@ -99,6 +99,24 @@ TOOLS: List[Dict[str, Any]] = [
         "path": "scripts/killswitch.py",
         "desc": "Writes STOP flags to stop runs/agents.",
     },
+    {
+        "id": "a2a_receive",
+        "kind": "a2a",
+        "path": "scripts/a2a_receive.py",
+        "desc": "Receives A2A payloads (stdin/file) and enqueues into ramshare/state/a2a/inbox with idempotency + ACK.",
+    },
+    {
+        "id": "a2a_executor",
+        "kind": "a2a",
+        "path": "scripts/a2a_remote_executor.py",
+        "desc": "Processes ramshare/state/a2a/inbox and executes a2a.v2 action_payload (default-off; enable with GEMINI_OP_REMOTE_EXEC_ENABLE=1).",
+    },
+    {
+        "id": "a2a_bridge_wsl",
+        "kind": "a2a",
+        "path": "scripts/a2a_bridge_wsl.py",
+        "desc": "Routes A2A payloads into a local WSL distro via stdin (no SSH).",
+    },
 ]
 
 

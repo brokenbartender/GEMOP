@@ -2,6 +2,8 @@
 
 This is the consolidated command list for the current A2A + multi-agent workflow.
 
+Note (Windows): use the lowercase script names in `scripts/` (for example `scripts/gemini_verify.py`). The older `GEMINI_*.py` filenames are legacy and do not work reliably on Windows case-insensitive filesystems.
+
 ## 1) Repo + Sync
 
 ```powershell
@@ -99,10 +101,10 @@ ramshare/notes/distilled/learning_tasks/
 ## 11) Phase 19-21 Verification (strict)
 
 ```powershell
-python scripts/GEMINI_verify.py --check phase19 --strict
-python scripts/GEMINI_verify.py --check phase20 --strict
-python scripts/GEMINI_verify.py --check phase21 --strict
-python scripts/GEMINI_verify.py --check all --strict
+python scripts/gemini_verify.py --check phase19 --strict
+python scripts/gemini_verify.py --check phase20 --strict
+python scripts/gemini_verify.py --check phase21 --strict
+python scripts/gemini_verify.py --check all --strict
 ```
 
 ## 12) Phase 22-27 Fast Finish
@@ -115,5 +117,5 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/phase_24_retry_loop.
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts/phase_22_27_orchestrate.ps1 -RunDir .agent-jobs/<run-id> -Threshold 70 -MaxReruns 2
 
 # Verify roadmap gates
-python scripts/GEMINI_verify.py --check roadmap --strict
+python scripts/gemini_verify.py --check roadmap --strict
 ```

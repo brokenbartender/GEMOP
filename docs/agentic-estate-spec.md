@@ -14,20 +14,20 @@ Translate the "house" analogy into an actionable architecture spec for Gemini-OP
 | Estate Component | Gemini-OP Implementation | Primary Failure Mode | Guardrail / Control | Verification |
 |---|---|---|---|---|
 | Bricks (tokens/work units) | Agent prompt + run artifacts in `.agent-jobs/*` | Low-quality output from underspecified prompts | Prompt contracts + quality scoring in `scripts/agent_self_learning.py` | `python scripts/agent_self_learning.py score-run --run-dir .agent-jobs/<run-id>` |
-| Mortar (attention/coherence) | Council protocol in `scripts/agent_batch_orchestrator.ps1` | Agents disagree silently, weak synthesis | Required `VERIFIED`/`CHALLENGED` + fail-closed council checks | `python scripts/GEMINI_verify.py --check phase22 --strict` |
+| Mortar (attention/coherence) | Council protocol in `scripts/agent_batch_orchestrator.ps1` | Agents disagree silently, weak synthesis | Required `VERIFIED`/`CHALLENGED` + fail-closed council checks | `python scripts/gemini_verify.py --check phase22 --strict` |
 | Floors (context window) | Run summaries + distilled lessons in `ramshare/state/learning/*` | Context drift or forgetting important outcomes | Close-loop learning and distilled task generation | `python scripts/agent_self_learning.py close-loop --run-dir .agent-jobs/<run-id> --threshold 70` |
-| Walls (sandbox boundaries) | Profile routing + env scoping in `scripts/GEMINI_dispatcher.py` | Cross-domain tool misuse or privilege spillover | Profile-constrained env and policy gating | `python scripts/GEMINI_verify.py --check phase20 --strict` |
-| Pipes (A2A transport) | `scripts/a2a_router.py`, `scripts/a2a_bridge_ssh.py` | Lost, duplicated, or poison messages | Idempotency, outbox, DLQ, retry/backoff | `python scripts/GEMINI_verify.py --check phase25 --strict` |
-| Hallways (bandwidth/traffic) | Queue + lease logic in `scripts/GEMINI_dispatcher.py` | Overload, lease contention, starvation | Circuit breaker + fairness deferral + lease TTL | `python scripts/GEMINI_verify.py --check phase20 --strict` |
-| Utility meters (cost/rate) | Governance + budgets in `scripts/GEMINI_governance.py` | Runaway spend | Agent budget caps, policy checks, kill switch | `python scripts/GEMINI_verify.py --check phase20 --strict` |
-| Fence + sensors (security) | Governance enforce calls in `scripts/safe-auto-run.ps1` and dispatcher | Unsafe actions proceed unattended | Governance gates before start/checkpoint/final checkpoint | `python scripts/GEMINI_verify.py --check phase26 --strict` |
-| Camera system (observability) | Ledger/audit JSONL + trace IDs in dispatcher/router | Untraceable failures | Trace IDs + explicit state transitions + latency telemetry | `python scripts/GEMINI_verify.py --check roadmap --strict` |
-| Thermostat (self-regulation) | World model in `scripts/world_model_snapshot.py` | False “healthy” status when stale | Freshness-aware health (`freshness_ok`, `stale_run_seconds`) | `python scripts/GEMINI_verify.py --check phase27 --strict` |
-| Breaker panel (resilience) | Circuit breaker in `ramshare/state/queue/circuit_breaker.flag` | Cascading failures | Open/half-open/closed dispatch control | `python scripts/GEMINI_dispatcher.py --dry-run` |
-| Control room (orchestrator) | `scripts/agent_batch_orchestrator.ps1` | Invalid council state or malformed manifest | Council manifest validation + strict run-script parsing | `python scripts/GEMINI_verify.py --check phase22 --strict` |
+| Walls (sandbox boundaries) | Profile routing + env scoping in `scripts/gemini_dispatcher.py` | Cross-domain tool misuse or privilege spillover | Profile-constrained env and policy gating | `python scripts/gemini_verify.py --check phase20 --strict` |
+| Pipes (A2A transport) | `scripts/a2a_router.py`, `scripts/a2a_bridge_ssh.py` | Lost, duplicated, or poison messages | Idempotency, outbox, DLQ, retry/backoff | `python scripts/gemini_verify.py --check phase25 --strict` |
+| Hallways (bandwidth/traffic) | Queue + lease logic in `scripts/gemini_dispatcher.py` | Overload, lease contention, starvation | Circuit breaker + fairness deferral + lease TTL | `python scripts/gemini_verify.py --check phase20 --strict` |
+| Utility meters (cost/rate) | Governance + budgets in `scripts/gemini_governance.py` | Runaway spend | Agent budget caps, policy checks, kill switch | `python scripts/gemini_verify.py --check phase20 --strict` |
+| Fence + sensors (security) | Governance enforce calls in `scripts/safe-auto-run.ps1` and dispatcher | Unsafe actions proceed unattended | Governance gates before start/checkpoint/final checkpoint | `python scripts/gemini_verify.py --check phase26 --strict` |
+| Camera system (observability) | Ledger/audit JSONL + trace IDs in dispatcher/router | Untraceable failures | Trace IDs + explicit state transitions + latency telemetry | `python scripts/gemini_verify.py --check roadmap --strict` |
+| Thermostat (self-regulation) | World model in `scripts/world_model_snapshot.py` | False “healthy” status when stale | Freshness-aware health (`freshness_ok`, `stale_run_seconds`) | `python scripts/gemini_verify.py --check phase27 --strict` |
+| Breaker panel (resilience) | Circuit breaker in `ramshare/state/queue/circuit_breaker.flag` | Cascading failures | Open/half-open/closed dispatch control | `python scripts/gemini_dispatcher.py --dry-run` |
+| Control room (orchestrator) | `scripts/agent_batch_orchestrator.ps1` | Invalid council state or malformed manifest | Council manifest validation + strict run-script parsing | `python scripts/gemini_verify.py --check phase22 --strict` |
 | Blueprints archive (audit/replay) | Run artifacts + safe-auto reports in `.safe-auto/runs/*` | Can’t reconstruct decisions | State snapshots + runner/Gemini logs + report | `powershell -File scripts/safe-auto-run.ps1 -Task "<task>"` |
 | Expansion rooms (scaling) | Parallel lanes in orchestrator (`MaxParallel`, `AgentsPerConsole`) | Host overload or stalled throughput | Safe parallel cap + watchdog timeout | `powershell -File scripts/agent_batch_orchestrator.ps1 -RunDir .agent-jobs/<run-id> -NoLaunch` |
-| Neighborhood rules (compliance/policy) | Policy checks in governance module | Non-compliant execution path | Enforcement at dispatch and safe-auto gates | `python scripts/GEMINI_verify.py --check phase20 --strict` |
+| Neighborhood rules (compliance/policy) | Policy checks in governance module | Non-compliant execution path | Enforcement at dispatch and safe-auto gates | `python scripts/gemini_verify.py --check phase20 --strict` |
 
 ## Current Gaps To Prioritize
 1. Add stronger A2A ACK contract semantics beyond transport success (explicit ack state schema).
@@ -70,8 +70,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/agent_batch_orchestr
 ## Immediate Operator Commands
 ```powershell
 # 1) Foundation verification
-python scripts/GEMINI_verify.py --check all --strict
-python scripts/GEMINI_verify.py --check roadmap --strict
+python scripts/gemini_verify.py --check all --strict
+python scripts/gemini_verify.py --check roadmap --strict
 
 # 2) Build world-model snapshot
 python scripts/world_model_snapshot.py --refresh
@@ -85,7 +85,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/agent_batch_orchestr
   -Threshold 70
 
 # 4) Dispatcher policy/fairness/circuit behavior dry run
-python scripts/GEMINI_dispatcher.py --dry-run
+python scripts/gemini_dispatcher.py --dry-run
 ```
 
 ## Definition of Done (Estate-Grade)
