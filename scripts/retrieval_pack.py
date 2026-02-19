@@ -131,6 +131,36 @@ def _scan_prompt_injection(lines: List[str], *, max_hits: int = 50) -> List[str]
     return out
 
 
+def _wormhole_hits(run_dir: Path, query: str, *, max_count: int) -> List[str]:
+    p = run_dir / "state" / "wormholes.jsonl"
+    if not p.exists():
+        return []
+    q = set(re.findall(r"[A-Za-z0-9_./\\-]+", (query or "").lower()))
+    out: List[str] = []
+    for ln in p.read_text(encoding="utf-8", errors="ignore").splitlines():
+        ln = ln.strip()
+        if not ln:
+            continue
+        try:
+            obj = json.loads(ln)
+        except Exception:
+            continue
+        src = str(obj.get("source_path") or "")
+        summary = str(obj.get("summary") or "")
+        aid = str(obj.get("anchor_id") or "")
+        text = f"{aid} {src} {summary}".strip()
+        if not text:
+            continue
+        if q:
+            toks = set(re.findall(r"[A-Za-z0-9_./\\-]+", text.lower()))
+            if len(q & toks) == 0:
+                continue
+        out.append(text[:380])
+        if len(out) >= max_count:
+            break
+    return out
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="Generate a bounded retrieval pack (specialized retrievers).")
     ap.add_argument("--repo-root", required=True)
@@ -187,6 +217,9 @@ def main() -> int:
     )
     payload["sections"].append(
         {"id": "memory", "title": "Memory Retriever (lessons + recent runs)", "hits": _rg(query, memory_roots, max_count=max_n)}
+    )
+    payload["sections"].append(
+        {"id": "wormholes", "title": "Wormhole Retriever (compressed long-range memory)", "hits": _wormhole_hits(run_dir, query, max_count=max_n)}
     )
 
     # Treat retrieval output as untrusted: scan for common prompt-injection instruction patterns.

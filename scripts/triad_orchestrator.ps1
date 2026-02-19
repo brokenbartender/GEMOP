@@ -982,6 +982,12 @@ function Generate-RunScaffold {
       $skills = "[SKILLS - AUTO-SELECTED PLAYBOOKS]`r`n$skills`r`n`r`n"
     }
 
+    $darkMatter = Read-Text (Join-Path $RunDir "state\\dark_matter_profile.md")
+    if ($darkMatter) {
+      if ($darkMatter.Length -gt 3000) { $darkMatter = $darkMatter.Substring(0, 3000) }
+      $darkMatter = "[DARK MATTER HALO - LATENT ALIGNMENT]`r`n$darkMatter`r`n`r`n"
+    }
+
     $cap = ""
     if ($InjectCapabilityContract) {
       $cap = @"
@@ -1098,7 +1104,7 @@ $pt
     } catch { $targetFiles = "" }
 
     $body = @"
- $facts$repoIndex$targetFiles$retrieval$world$sources$skills$anchor$lessons$header
+ $facts$repoIndex$targetFiles$retrieval$world$sources$skills$darkMatter$anchor$lessons$header
  $cap$supervisorMemo$ownerBlock$onto$misinfo$adv$poison
  [OPERATIONAL CONTEXT]
   REPO_ROOT: $RepoRoot
@@ -1603,9 +1609,60 @@ $skipAgentIds = Parse-AgentIdList $SkipAgents
 $adversaryIds = Parse-AgentIdList $Adversaries
 $supervisorOn = $EnableSupervisor -or $EnableCouncilBus
 
+# Script registry: define once so all lifecycle stages use consistent paths.
+$eventHorizonScript = Join-Path $RepoRoot "scripts\event_horizon.py"
+$higgsScript = Join-Path $RepoRoot "scripts\higgs_field.py"
+$thermoScript = Join-Path $RepoRoot "scripts\thermodynamics.py"
+$maxwellScript = Join-Path $RepoRoot "scripts\maxwells_demon.py"
+$iolausScript = Join-Path $RepoRoot "scripts\iolaus_cauterize.py"
+$zhinanScript = Join-Path $RepoRoot "scripts\zhinan_alignment.py"
+$renScript = Join-Path $RepoRoot "scripts\ren_guardian.py"
+$lotusScript = Join-Path $RepoRoot "scripts\lotus_pruner.py"
+$wampumScript = Join-Path $RepoRoot "scripts\wampum_ledger.py"
+$tarotScript = Join-Path $RepoRoot "scripts\tarot_telemetry.py"
+$gravityScript = Join-Path $RepoRoot "scripts\gravity_well.py"
+$quantumScript = Join-Path $RepoRoot "scripts\quantum_state.py"
+$radioScript = Join-Path $RepoRoot "scripts\spirit_radio.py"
+$eggScript = Join-Path $RepoRoot "scripts\gyro_context.py"
+$telluricScript = Join-Path $RepoRoot "scripts\telluric_resonance.py"
+$resonatorScript = Join-Path $RepoRoot "scripts\resonator_stress.py"
+$manaScript = Join-Path $RepoRoot "scripts\mana_ranker.py"
+$hubbleScript = Join-Path $RepoRoot "scripts\hubble_drift.py"
+$wormholeScript = Join-Path $RepoRoot "scripts\wormhole_indexer.py"
+$darkMatterScript = Join-Path $RepoRoot "scripts\dark_matter_halo.py"
+$mythRuntimeScript = Join-Path $RepoRoot "scripts\myth_runtime.py"
+
+# --- Phase VI: Event Horizon (pre-split dense prompts before dispatch) ---
+try {
+    if ((Test-Path $eventHorizonScript) -and -not [string]::IsNullOrWhiteSpace($Prompt)) {
+        $ehPolicy = if ($env:GEMINI_OP_EVENT_HORIZON_POLICY) { $env:GEMINI_OP_EVENT_HORIZON_POLICY } else { "binary_star" }
+        $ehRaw = & python $eventHorizonScript --run-dir $RunDir --prompt "$Prompt" --split-policy $ehPolicy
+        if ($LASTEXITCODE -eq 0 -and $ehRaw) {
+            $eh = $ehRaw | ConvertFrom-Json
+            if ($eh -and $eh.split_required -and $eh.shards -and $eh.shards.Count -gt 0) {
+                $Prompt = [string]$eh.shards[0]
+                $rs = $null
+                $cr = $null
+                try { $rs = $eh.physics.r_s } catch { }
+                try { $cr = $eh.physics.context_radius_units } catch { }
+                Write-Log ("[EVENT HORIZON] Schwarzschild radius exceeded context radius. Split into {0} shards; executing shard 1 first." -f $eh.shards.Count)
+                Write-OrchLog -RunDir $RunDir -Msg ("event_horizon_split policy={0} shards={1} r_s={2} context_radius={3}" -f $ehPolicy, $eh.shards.Count, $rs, $cr)
+            } else {
+                $rs = $null
+                $cr = $null
+                try { $rs = $eh.physics.r_s } catch { }
+                try { $cr = $eh.physics.context_radius_units } catch { }
+                Write-OrchLog -RunDir $RunDir -Msg ("event_horizon_ok policy={0} r_s={1} context_radius={2}" -f $ehPolicy, $rs, $cr)
+            }
+        }
+    }
+} catch {
+    try { Write-OrchLog -RunDir $RunDir -Msg ("event_horizon_failed error={0}" -f $_.Exception.Message) } catch { }
+}
+# --- End Event Horizon ---
+
 # --- Higgs Field: Mass Generation & Time Dilation ---
 try {
-    $higgsScript = Join-Path $RepoRoot "scripts\higgs_field.py"
     if (Test-Path $higgsScript) {
         # Check prompt mass
         $mass = & python $higgsScript --text "$Prompt"
@@ -1617,11 +1674,6 @@ try {
     }
 } catch { }
 # --- End Higgs ---
-
-# --- Thermodynamics of Intelligence: Phase V ---
-$thermoScript = Join-Path $RepoRoot "scripts\thermodynamics.py"
-$maxwellScript = Join-Path $RepoRoot "scripts\maxwells_demon.py"
-# --- End Thermodynamics Init ---
 
 # Optional: compile a tighter role team (3..7) to reduce swarm overhead and improve quality.
 if ($AutoTeam -and -not [string]::IsNullOrWhiteSpace($Prompt)) {
@@ -1917,6 +1969,29 @@ if ($existingRunnerScripts -and $existingRunnerScripts.Count -gt 0) {
       try { Append-LifecycleEvent -RunDir $RunDir -Event "retrieval_pack_failed" -RoundNumber $r -AgentId 0 -Details @{ error = $_.Exception.Message } } catch { }
     }
 
+    # Consolidated mythology/physics plugin runtime for long-range memory and latent alignment.
+    try {
+      if (Test-Path -LiteralPath $mythRuntimeScript) {
+        & python $mythRuntimeScript --repo-root $RepoRoot --run-dir $RunDir --query $Prompt --round $r | Out-Null
+        Write-OrchLog -RunDir $RunDir -Msg ("myth_runtime_done round={0}" -f $r)
+      } else {
+        if (Test-Path -LiteralPath $hubbleScript) {
+          & python $hubbleScript --repo-root $RepoRoot --run-dir $RunDir --query $Prompt | Out-Null
+          Write-OrchLog -RunDir $RunDir -Msg ("hubble_drift_written round={0}" -f $r)
+        }
+        if (Test-Path -LiteralPath $wormholeScript) {
+          & python $wormholeScript --run-dir $RunDir --query $Prompt --max-nodes 10 | Out-Null
+          Write-OrchLog -RunDir $RunDir -Msg ("wormhole_index_written round={0}" -f $r)
+        }
+        if (Test-Path -LiteralPath $darkMatterScript) {
+          & python $darkMatterScript --run-dir $RunDir --query $Prompt | Out-Null
+          Write-OrchLog -RunDir $RunDir -Msg ("dark_matter_profile_written round={0}" -f $r)
+        }
+      }
+    } catch {
+      try { Write-OrchLog -RunDir $RunDir -Msg ("myth_runtime_failed round={0} error={1}" -f $r, $_.Exception.Message) } catch { }
+    }
+
           # --- Heraclean & Greek Optimization ---
     
           # 1. Procrustes: Input Normalization
@@ -2113,9 +2188,6 @@ if ($existingRunnerScripts -and $existingRunnerScripts.Count -gt 0) {
                       # --- Native American Expansion: Wampum Signing ---
 
                       try {
-
-                          $wampumScript = Join-Path $RepoRoot "scripts\wampum_ledger.py"
-
                           if (Test-Path $wampumScript) {
 
                               for ($ai = 1; $ai -le $agentCount; $ai++) {
@@ -2279,7 +2351,6 @@ if ($existingRunnerScripts -and $existingRunnerScripts.Count -gt 0) {
 
       # 1. Iolaus: Cauterize Hydra Loops (Recursive Fork Detection)
       try {
-        $iolausScript = Join-Path $RepoRoot "scripts\iolaus_cauterize.py"
         if (Test-Path $iolausScript) {
             & python $iolausScript --run-dir $RunDir | Out-Null
         }
@@ -2291,7 +2362,6 @@ if ($existingRunnerScripts -and $existingRunnerScripts.Count -gt 0) {
 
       # 1. Zhinan Chariot: Goal Alignment
       try {
-        $zhinanScript = Join-Path $RepoRoot "scripts\zhinan_alignment.py"
         if (Test-Path $zhinanScript) {
             & python $zhinanScript --run-dir $RunDir --round $r
             if ($LASTEXITCODE -ne 0) {
@@ -2308,7 +2378,6 @@ if ($existingRunnerScripts -and $existingRunnerScripts.Count -gt 0) {
 
       # 1. The Ren: Identity Guardian (Injection Check)
       try {
-        $renScript = Join-Path $RepoRoot "scripts\ren_guardian.py"
         if (Test-Path $renScript) {
             & python $renScript --run-dir $RunDir --round $r
             if ($LASTEXITCODE -ne 0) {
@@ -2347,9 +2416,6 @@ if ($existingRunnerScripts -and $existingRunnerScripts.Count -gt 0) {
                 # 1. Lotus Flower: Context Pruning
       
                 try {
-      
-                  $lotusScript = Join-Path $RepoRoot "scripts\lotus_pruner.py"
-      
                   if (Test-Path $lotusScript) {
       
                       # --- Thermodynamics: Landauer's Principle (Cost of Forgetting) ---
@@ -2423,13 +2489,6 @@ if ($existingRunnerScripts -and $existingRunnerScripts.Count -gt 0) {
     
 
                 try {
-
-    
-
-                  $tarotScript = Join-Path $RepoRoot "scripts\tarot_telemetry.py"
-
-    
-
                   if (Test-Path $tarotScript) {
 
     
@@ -2462,7 +2521,6 @@ if ($existingRunnerScripts -and $existingRunnerScripts.Count -gt 0) {
 
       # 1. Gravity Well: Context Geometry
       try {
-        $gravityScript = Join-Path $RepoRoot "scripts\gravity_well.py"
         if (Test-Path $gravityScript) {
             & python $gravityScript --run-dir $RunDir | Out-Null
         }
@@ -2470,7 +2528,6 @@ if ($existingRunnerScripts -and $existingRunnerScripts.Count -gt 0) {
 
       # 2. Quantum Collapse: Observer Effect
       try {
-        $quantumScript = Join-Path $RepoRoot "scripts\quantum_state.py"
         if (Test-Path $quantumScript) {
             & python $quantumScript --run-dir $RunDir --round $r | Out-Null
         }
@@ -2482,7 +2539,6 @@ if ($existingRunnerScripts -and $existingRunnerScripts.Count -gt 0) {
 
       # 1. Spirit Radio: VLF Listening
       try {
-        $radioScript = Join-Path $RepoRoot "scripts\spirit_radio.py"
         if (Test-Path $radioScript) {
             & python $radioScript --run-dir $RunDir | Out-Null
         }
@@ -2490,7 +2546,6 @@ if ($existingRunnerScripts -and $existingRunnerScripts.Count -gt 0) {
 
       # 2. Egg of Columbus: Context Stabilization
       try {
-        $eggScript = Join-Path $RepoRoot "scripts\gyro_context.py"
         if (Test-Path $eggScript) {
             & python $eggScript --run-dir $RunDir | Out-Null
         }
@@ -2502,12 +2557,27 @@ if ($existingRunnerScripts -and $existingRunnerScripts.Count -gt 0) {
 
       # 1. Wardenclyffe: Broadcast State to Telluric Wave
       try {
-        $telluricScript = Join-Path $RepoRoot "scripts\telluric_resonance.py"
         if (Test-Path $telluricScript) {
+            $scoreForWave = 0.0
+            try {
+                $supRound = Join-Path $RunDir ("state\\supervisor_round{0}.json" -f $r)
+                if (Test-Path -LiteralPath $supRound) {
+                    $supObj = Get-Content -LiteralPath $supRound -Raw -ErrorAction SilentlyContinue | ConvertFrom-Json
+                    if ($supObj -and $supObj.verdicts) {
+                        $roundScores = @()
+                        foreach ($v in $supObj.verdicts) {
+                            try { $roundScores += [double]$v.score } catch { }
+                        }
+                        if ($roundScores.Count -gt 0) {
+                            $scoreForWave = [double](($roundScores | Measure-Object -Average).Average)
+                        }
+                    }
+                }
+            } catch { }
             $waveVal = @{
                 round = $r
                 status = "complete"
-                score = $supervisorAvg
+                score = $scoreForWave
             } | ConvertTo-Json -Compress
             # Escape quotes for CLI
             $waveVal = $waveVal.Replace('"', '\"')
@@ -2519,7 +2589,6 @@ if ($existingRunnerScripts -and $existingRunnerScripts.Count -gt 0) {
       # Only run if we are in a high-stakes round (3+) to verify structural integrity
       if ($r -eq 3) {
         try {
-            $resonatorScript = Join-Path $RepoRoot "scripts\resonator_stress.py"
             if (Test-Path $resonatorScript) {
                 & python $resonatorScript --run-dir $RunDir | Out-Null
             }
@@ -2527,6 +2596,25 @@ if ($existingRunnerScripts -and $existingRunnerScripts.Count -gt 0) {
       }
 
       # --- End Tesla Expansion ---
+
+      # Optional: adaptive concurrency based on prior metrics (conservative reductions only).
+      if ($AdaptiveConcurrency -and $r -ge 2) {
+        try {
+          $ac = Join-Path $RepoRoot "scripts\\adaptive_concurrency.py"
+          if (Test-Path -LiteralPath $ac) {
+            & python $ac --run-dir $RunDir --current-max-parallel $MaxParallel --current-max-local $MaxLocalConcurrency | Out-Null
+            $cc = Read-JsonOrNull -Path (Join-Path $RunDir "state\\concurrency.json")
+            if ($cc -and $cc.recommended) {
+              $MaxParallel = [int]$cc.recommended.max_parallel
+              $MaxLocalConcurrency = [int]$cc.recommended.max_local_concurrency
+              $env:GEMINI_OP_MAX_LOCAL_CONCURRENCY = "$MaxLocalConcurrency"
+              Write-OrchLog -RunDir $RunDir -Msg ("adaptive_concurrency round={0} max_parallel={1} max_local={2}" -f $r, $MaxParallel, $MaxLocalConcurrency)
+            }
+          }
+        } catch {
+          Write-OrchLog -RunDir $RunDir -Msg ("adaptive_concurrency_failed round={0} error={1}" -f $r, $_.Exception.Message)
+        }
+      }
 
       if ($CouncilPattern -ne "debate") { break }
 
@@ -2616,6 +2704,14 @@ if ($AutoTuneFromLearning -and $EnableCouncilBus) {
   }
 }
 
+# --- Global Expansion: Mana Accumulation ---
+try {
+  if (Test-Path $manaScript) {
+    & python $manaScript --run-dir $RunDir | Out-Null
+  }
+} catch { }
+# --- End Mana ---
+
 if ($FailClosedOnThreshold -and ($finalAvg -lt $Threshold)) {
   Write-Log "FAIL (threshold)"
   Write-OrchLog -RunDir $RunDir -Msg "exit fail_threshold"
@@ -2625,31 +2721,3 @@ if ($FailClosedOnThreshold -and ($finalAvg -lt $Threshold)) {
 Write-Log "OK"
   Write-OrchLog -RunDir $RunDir -Msg "exit ok"
   exit 0
-
-    # Optional: adaptive concurrency based on prior metrics (conservative reductions only).
-    if ($AdaptiveConcurrency -and $r -ge 2) {
-      try {
-        $ac = Join-Path $RepoRoot "scripts\\adaptive_concurrency.py"
-        if (Test-Path -LiteralPath $ac) {
-          & python $ac --run-dir $RunDir --current-max-parallel $MaxParallel --current-max-local $MaxLocalConcurrency | Out-Null
-          $cc = Read-JsonOrNull -Path (Join-Path $RunDir "state\\concurrency.json")
-          if ($cc -and $cc.recommended) {
-            $MaxParallel = [int]$cc.recommended.max_parallel
-            $MaxLocalConcurrency = [int]$cc.recommended.max_local_concurrency
-            $env:GEMINI_OP_MAX_LOCAL_CONCURRENCY = "$MaxLocalConcurrency"
-            Write-OrchLog -RunDir $RunDir -Msg ("adaptive_concurrency round={0} max_parallel={1} max_local={2}" -f $r, $MaxParallel, $MaxLocalConcurrency)
-          }
-        }
-      } catch {
-        Write-OrchLog -RunDir $RunDir -Msg ("adaptive_concurrency_failed error={0}" -f $_.Exception.Message)
-      }
-    }
-
-# --- Global Expansion: Mana Accumulation ---
-try {
-    $manaScript = Join-Path $RepoRoot "scripts\mana_ranker.py"
-    if (Test-Path $manaScript) {
-        & python $manaScript --run-dir $RunDir | Out-Null
-    }
-} catch { }
-# --- End Mana ---

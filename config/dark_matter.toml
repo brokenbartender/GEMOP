@@ -1,0 +1,13 @@
+[dark_matter]
+enabled = true
+
+[dark_matter.base_weights]
+safety = 0.35
+efficiency = 0.20
+goal_coherence = 0.25
+verification = 0.20
+
+[dark_matter.policy]
+prefer_repo_grounding = true
+prefer_minimal_edits = true
+require_verification_bias = true

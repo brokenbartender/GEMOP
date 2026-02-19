@@ -46,6 +46,9 @@ pwsh .\scripts\summon.ps1 -Task "Fix the failing tests and add coverage for the 
 
 - `scripts\smart_summon.ps1` — The primary entrypoint for multi-repo, autonomous tasks.
 - `scripts\triad_orchestrator.ps1` — primary orchestrator engine.
+- `scripts\event_horizon.py` — Schwarzschild-style pre-dispatch context-collapse guard.
+- `scripts\hawking_emitter.py` — failure micro-summary emitter for terminated loops/tasks.
+- `scripts\myth_runtime.py` — consolidated Phase VI plugin dispatcher (Hubble/Wormhole/Dark-Matter).
 - `scripts\yeet.ps1` — Sovereign delivery tool (Verified Push).
 - `scripts\slavic_recovery.ps1` — System healing and resurrection.
 
