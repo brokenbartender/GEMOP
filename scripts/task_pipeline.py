@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import time
 from pathlib import Path
 from typing import Any
@@ -18,6 +19,13 @@ def _read_json(path: Path) -> dict[str, Any]:
     except Exception:
         pass
     return {}
+
+
+def _read_text(path: Path) -> str:
+    try:
+        return path.read_text(encoding="utf-8", errors="ignore")
+    except Exception:
+        return ""
 
 
 def _stage_for_round(pattern: str, round_n: int) -> str:
@@ -149,6 +157,135 @@ def _markdown(pipeline: dict[str, Any]) -> str:
     return "\n".join(lines).rstrip() + "\n"
 
 
+def _load_supervisor_scores(run_dir: Path, round_n: int) -> dict[int, dict[str, Any]]:
+    out: dict[int, dict[str, Any]] = {}
+    sup = _read_json(run_dir / "state" / f"supervisor_round{round_n}.json")
+    rows = sup.get("verdicts") if isinstance(sup.get("verdicts"), list) else []
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        try:
+            aid = int(row.get("agent") or 0)
+        except Exception:
+            aid = 0
+        if aid <= 0:
+            continue
+        out[aid] = {
+            "score": int(row.get("score") or 0),
+            "status": str(row.get("status") or ""),
+        }
+    return out
+
+
+def _round_output_text(run_dir: Path, round_n: int, agent_id: int) -> str:
+    p = run_dir / f"round{round_n}_agent{agent_id}.md"
+    if p.exists():
+        return _read_text(p)
+    return _read_text(run_dir / f"agent{agent_id}.md")
+
+
+DIFF_RE = re.compile(r"```diff\s*.*?```", flags=re.IGNORECASE | re.DOTALL)
+DECISION_RE = re.compile(r"```json\s*DECISION_JSON\s*(\{.*?\})\s*```", flags=re.IGNORECASE | re.DOTALL)
+
+
+def _signals(text: str) -> dict[str, bool]:
+    t = text or ""
+    return {
+        "has_diff": bool(DIFF_RE.search(t)),
+        "has_decision_json": bool(DECISION_RE.search(t)),
+        "completed": bool(re.search(r"(?m)^COMPLETED\s*$", t)),
+    }
+
+
+def build_rankings(run_dir: Path, round_n: int, agent_count: int) -> dict[str, Any]:
+    sup = _load_supervisor_scores(run_dir, round_n)
+    rankings: list[dict[str, Any]] = []
+
+    for aid in range(1, max(1, int(agent_count)) + 1):
+        txt = _round_output_text(run_dir, round_n, aid)
+        sig = _signals(txt)
+        sv = sup.get(aid, {})
+        s_score = int(sv.get("score") or 0)
+        s_status = str(sv.get("status") or "")
+
+        # Deterministic weighted score in [0, 100]
+        score = 0.0
+        score += 0.70 * max(0, min(100, s_score))
+        if s_status == "OK":
+            score += 10.0
+        elif s_status == "WARN":
+            score += 2.0
+        if sig["has_decision_json"]:
+            score += 8.0
+        if sig["has_diff"]:
+            score += 8.0
+        if sig["completed"]:
+            score += 4.0
+        if not txt.strip():
+            score = 0.0
+        score = max(0.0, min(100.0, score))
+
+        rankings.append(
+            {
+                "agent": aid,
+                "score": int(round(score)),
+                "supervisor_score": int(s_score),
+                "status": s_status,
+                "has_decision_json": bool(sig["has_decision_json"]),
+                "has_diff": bool(sig["has_diff"]),
+                "completed": bool(sig["completed"]),
+            }
+        )
+
+    rankings.sort(key=lambda r: (-int(r.get("score") or 0), int(r.get("agent") or 0)))
+    top_agent = int(rankings[0]["agent"]) if rankings else 0
+
+    return {
+        "schema_version": 1,
+        "generated_at": time.time(),
+        "method": "deterministic_v1",
+        "round": int(round_n),
+        "agent_count": int(agent_count),
+        "top_agent": top_agent,
+        "rankings": rankings,
+    }
+
+
+def write_rankings(run_dir: Path, ranking: dict[str, Any], round_n: int) -> dict[str, str]:
+    state = run_dir / "state"
+    state.mkdir(parents=True, exist_ok=True)
+    rj = state / f"task_rank_round{round_n}.json"
+    lj = state / "task_rank_latest.json"
+    rm = state / f"task_rank_round{round_n}.md"
+    lines = [
+        "# Task Rank",
+        "",
+        f"- round: {ranking.get('round')}",
+        f"- top_agent: {ranking.get('top_agent')}",
+        f"- method: {ranking.get('method')}",
+        "",
+    ]
+    for row in ranking.get("rankings", []):
+        if not isinstance(row, dict):
+            continue
+        lines.append(
+            "- agent {0}: score={1} supervisor={2} status={3} decision={4} diff={5} completed={6}".format(
+                row.get("agent"),
+                row.get("score"),
+                row.get("supervisor_score"),
+                row.get("status"),
+                row.get("has_decision_json"),
+                row.get("has_diff"),
+                row.get("completed"),
+            )
+        )
+    txt = json.dumps(ranking, indent=2)
+    rj.write_text(txt, encoding="utf-8")
+    lj.write_text(txt, encoding="utf-8")
+    rm.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
+    return {"json": str(rj), "latest_json": str(lj), "md": str(rm)}
+
+
 def write_pipeline(run_dir: Path, pipeline: dict[str, Any], round_n: int) -> dict[str, str]:
     state = run_dir / "state"
     state.mkdir(parents=True, exist_ok=True)
@@ -171,10 +308,25 @@ def main() -> None:
     ap.add_argument("--round", dest="round_n", type=int, required=True)
     ap.add_argument("--pattern", default="debate")
     ap.add_argument("--prompt", default="")
+    ap.add_argument("--rank", action="store_true", help="Build deterministic round rankings for owner/auto-apply selection.")
+    ap.add_argument("--agent-count", type=int, default=0)
     args = ap.parse_args()
 
     run_dir = Path(args.run_dir).resolve()
     try:
+        if args.rank:
+            ac = int(args.agent_count or 0)
+            if ac <= 0:
+                raise ValueError("missing_agent_count_for_rank")
+            ranking = build_rankings(run_dir, int(args.round_n), ac)
+            paths = write_rankings(run_dir, ranking, int(args.round_n))
+            print(
+                json.dumps(
+                    {"ok": True, "mode": "rank", "paths": paths, "top_agent": ranking.get("top_agent")},
+                    separators=(",", ":"),
+                )
+            )
+            raise SystemExit(0)
         pipeline = build_pipeline(run_dir, str(args.pattern or ""), int(args.round_n), str(args.prompt or ""))
         paths = write_pipeline(run_dir, pipeline, int(args.round_n))
         print(json.dumps({"ok": True, "paths": paths, "stage": pipeline.get("stage"), "prompt_addendum": pipeline.get("prompt_addendum")}, separators=(",", ":")))

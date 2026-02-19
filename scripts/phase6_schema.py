@@ -5,6 +5,7 @@ from typing import Any
 
 TASK_CONTRACT_SCHEMA_VERSION = 1
 TASK_PIPELINE_SCHEMA_VERSION = 1
+TASK_RANK_SCHEMA_VERSION = 1
 TASK_PIPELINE_STAGES = {"planner", "planner_executor", "executor_verifier"}
 
 
@@ -77,3 +78,36 @@ def validate_task_pipeline_obj(obj: dict[str, Any], round_n: int) -> list[str]:
             errors.append(f"task_pipeline.stage_focus.{role}.inputs")
     return errors
 
+
+def validate_task_rank_obj(obj: dict[str, Any], round_n: int) -> list[str]:
+    errors: list[str] = []
+    if int(obj.get("schema_version", -1)) != TASK_RANK_SCHEMA_VERSION:
+        errors.append("task_rank.schema_version")
+    if not is_num(obj.get("generated_at")):
+        errors.append("task_rank.generated_at")
+    if int(obj.get("round", -1)) != int(round_n):
+        errors.append("task_rank.round")
+    if not isinstance(obj.get("method"), str) or not str(obj.get("method")).strip():
+        errors.append("task_rank.method")
+    if not isinstance(obj.get("top_agent"), int):
+        errors.append("task_rank.top_agent")
+    rows = obj.get("rankings")
+    if not isinstance(rows, list) or not rows:
+        errors.append("task_rank.rankings")
+        return errors
+    for i, row in enumerate(rows):
+        if not isinstance(row, dict):
+            errors.append(f"task_rank.rankings[{i}]")
+            continue
+        if not isinstance(row.get("agent"), int):
+            errors.append(f"task_rank.rankings[{i}].agent")
+        if not isinstance(row.get("score"), int):
+            errors.append(f"task_rank.rankings[{i}].score")
+        if not isinstance(row.get("supervisor_score"), int):
+            errors.append(f"task_rank.rankings[{i}].supervisor_score")
+        if not isinstance(row.get("status"), str):
+            errors.append(f"task_rank.rankings[{i}].status")
+        for k in ("has_decision_json", "has_diff", "completed"):
+            if not isinstance(row.get(k), bool):
+                errors.append(f"task_rank.rankings[{i}].{k}")
+    return errors

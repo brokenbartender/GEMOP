@@ -68,6 +68,53 @@ class TaskPipelineTests(unittest.TestCase):
             self.assertTrue((run_dir / "state" / "task_pipeline_round2.md").exists())
             self.assertTrue((run_dir / "state" / "task_pipeline_latest.json").exists())
 
+    def test_task_pipeline_rank_mode_is_deterministic(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="gemop_tp_rank_") as td:
+            run_dir = Path(td).resolve()
+            state = run_dir / "state"
+            state.mkdir(parents=True, exist_ok=True)
+
+            # Two agents with different supervisor/output quality.
+            (run_dir / "round2_agent1.md").write_text(
+                "```json DECISION_JSON\n{\"summary\":\"a\",\"files\":[\"scripts/x.py\"],\"commands\":[\"python -m pytest -q tests\"],\"risks\":[],\"confidence\":0.7}\n```\n```diff\ndiff --git a/scripts/x.py b/scripts/x.py\n--- a/scripts/x.py\n+++ b/scripts/x.py\n@@ -1 +1 @@\n-print('a')\n+print('b')\n```\nCOMPLETED\n",
+                encoding="utf-8",
+            )
+            (run_dir / "round2_agent2.md").write_text("No decision json here.\n", encoding="utf-8")
+            (state / "supervisor_round2.json").write_text(
+                json.dumps(
+                    {
+                        "verdicts": [
+                            {"agent": 1, "score": 82, "status": "OK"},
+                            {"agent": 2, "score": 84, "status": "WARN"},
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            cp = subprocess.run(
+                [
+                    os.fspath(Path(sys.executable)),
+                    os.fspath(REPO_ROOT / "scripts" / "task_pipeline.py"),
+                    "--run-dir",
+                    os.fspath(run_dir),
+                    "--round",
+                    "2",
+                    "--rank",
+                    "--agent-count",
+                    "2",
+                ],
+                cwd=str(REPO_ROOT),
+                text=True,
+                capture_output=True,
+                timeout=30,
+            )
+            self.assertEqual(cp.returncode, 0, msg=cp.stderr or cp.stdout)
+            out = json.loads(cp.stdout)
+            self.assertTrue(out.get("ok"))
+            self.assertEqual(int(out.get("top_agent") or 0), 1)
+            self.assertTrue((state / "task_rank_round2.json").exists())
+
     def test_task_pipeline_fails_without_contract(self) -> None:
         with tempfile.TemporaryDirectory(prefix="gemop_tp_fail_") as td:
             run_dir = Path(td).resolve()

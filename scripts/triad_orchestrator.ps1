@@ -647,6 +647,28 @@ function Get-CloudCallsRemaining([string]$RunDir) {
   }
 }
 
+function Get-TopRankedAgent {
+  param(
+    [string]$RunDir,
+    [int]$RoundNumber,
+    [int[]]$SkipAgentIds
+  )
+  if ($RoundNumber -le 0) { return 0 }
+  $p = Join-Path $RunDir ("state\\task_rank_round{0}.json" -f $RoundNumber)
+  $obj = Read-JsonOrNull -Path $p
+  if (-not $obj) { return 0 }
+  try {
+    $rows = @($obj.rankings)
+    foreach ($row in $rows) {
+      $aid = [int]$row.agent
+      if ($aid -le 0) { continue }
+      if ($SkipAgentIds -and $SkipAgentIds.Count -gt 0 -and ($SkipAgentIds -contains $aid)) { continue }
+      return $aid
+    }
+  } catch { }
+  return 0
+}
+
 function Update-OwnerFromSupervisor {
   param(
     [string]$RunDir,
@@ -671,11 +693,16 @@ function Update-OwnerFromSupervisor {
 
   $best = $null
   try {
-    $cands = @($obj.verdicts | Where-Object { $_.status -eq "OK" })
-    if ($SkipAgentIds -and $SkipAgentIds.Count -gt 0) {
-      $cands = @($cands | Where-Object { -not ($SkipAgentIds -contains [int]$_.agent) })
+    $rankedOwner = Get-TopRankedAgent -RunDir $RunDir -RoundNumber $RoundNumber -SkipAgentIds $SkipAgentIds
+    if ($rankedOwner -gt 0) {
+      $best = @([pscustomobject]@{ agent = $rankedOwner; score = 999 })
+    } else {
+      $cands = @($obj.verdicts | Where-Object { $_.status -eq "OK" })
+      if ($SkipAgentIds -and $SkipAgentIds.Count -gt 0) {
+        $cands = @($cands | Where-Object { -not ($SkipAgentIds -contains [int]$_.agent) })
+      }
+      $best = @($cands | Sort-Object score -Descending | Select-Object -First 1)
     }
-    $best = @($cands | Sort-Object score -Descending | Select-Object -First 1)
   } catch { $best = $null }
 
   $owner = 0
@@ -2372,6 +2399,25 @@ if ($existingRunnerScripts -and $existingRunnerScripts.Count -gt 0) {
       }
     }
 
+    # Deterministic round ranking for owner selection + auto-apply candidate.
+    try {
+      if (Test-Path -LiteralPath $taskPipelineScript) {
+        $rankRaw = & python $taskPipelineScript --run-dir $RunDir --round $r --rank --agent-count $agentCount
+        if ($LASTEXITCODE -eq 0) {
+          try {
+            $rankObj = $rankRaw | ConvertFrom-Json
+            Write-OrchLog -RunDir $RunDir -Msg ("task_rank_written round={0} top_agent={1}" -f $r, $rankObj.top_agent)
+          } catch {
+            Write-OrchLog -RunDir $RunDir -Msg ("task_rank_written round={0}" -f $r)
+          }
+        } else {
+          Write-OrchLog -RunDir $RunDir -Msg ("task_rank_failed round={0}" -f $r)
+        }
+      }
+    } catch {
+      Write-OrchLog -RunDir $RunDir -Msg ("task_rank_failed round={0} error={1}" -f $r, $_.Exception.Message)
+    }
+
     # Autonomous resilience: quarantine low-integrity agents for subsequent rounds.
     if ($Autonomous -and $supervisorOn -and $MaxRounds -ge 2) {
       try {
@@ -2450,6 +2496,11 @@ if ($existingRunnerScripts -and $existingRunnerScripts.Count -gt 0) {
           "--require-diff-blocks",
           "--verify"
         )
+        $rankedForApply = Get-TopRankedAgent -RunDir $RunDir -RoundNumber $r -SkipAgentIds $skipAgentIds
+        if ($rankedForApply -gt 0) {
+          $cpaArgs += @("--agent","$rankedForApply")
+          Write-OrchLog -RunDir $RunDir -Msg ("auto_apply_ranked_agent round={0} agent={1}" -f $r, $rankedForApply)
+        }
         if ($RequireApproval) { $cpaArgs += "--require-approval" }
         if ($RequireGrounding) { $cpaArgs += "--require-grounding" }
         try { Append-LifecycleEvent -RunDir $RunDir -Event "auto_apply_patches_start" -RoundNumber $r -AgentId 0 -Details @{ require_approval = [bool]$RequireApproval; require_grounding = [bool]$RequireGrounding } } catch { }

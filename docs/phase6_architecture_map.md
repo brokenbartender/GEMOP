@@ -63,6 +63,7 @@ Primary run-state files under `<run_dir>/state`:
 - `hawking_radiation.jsonl`
 - `task_contract.json`
 - `task_pipeline_roundN.json`
+- `task_rank_roundN.json`
 - `lifecycle_events.jsonl`
 
 Bus artifacts under `<run_dir>/bus`:
@@ -111,3 +112,4 @@ Move toward one plugin runtime:
 - `scripts/phase6_schema.py` is the canonical schema validator/constants module for:
   - `task_contract_roundN.json`
   - `task_pipeline_roundN.json`
+  - `task_rank_roundN.json`

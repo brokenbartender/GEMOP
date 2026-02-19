@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from phase6_schema import is_num, validate_task_contract_obj, validate_task_pipeline_obj
+from phase6_schema import is_num, validate_task_contract_obj, validate_task_pipeline_obj, validate_task_rank_obj
 
 def _load_json(path: Path) -> dict[str, Any] | None:
     if not path.exists():
@@ -118,6 +118,13 @@ def validate(run_dir: Path, round_n: int) -> dict[str, Any]:
     _validate_myth_runtime(state / f"myth_runtime_round{round_n}.json", round_n, errors)
     _validate_task_contract(state / f"task_contract_round{round_n}.json", round_n, errors)
     _validate_task_pipeline(state / f"task_pipeline_round{round_n}.json", round_n, errors)
+    task_rank_path = state / f"task_rank_round{round_n}.json"
+    if task_rank_path.exists():
+        rank_obj = _load_json(task_rank_path)
+        if rank_obj is None:
+            errors.append(f"missing_or_invalid_json:{task_rank_path}")
+        else:
+            errors.extend(validate_task_rank_obj(rank_obj, int(round_n)))
     return {"ok": len(errors) == 0, "errors": errors, "run_dir": str(run_dir), "round": int(round_n)}
 
 

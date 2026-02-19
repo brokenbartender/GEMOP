@@ -51,7 +51,7 @@ pwsh .\scripts\summon.ps1 -Task "Fix the failing tests and add coverage for the 
 - `scripts\myth_runtime.py` — consolidated Phase VI plugin dispatcher (Hubble/Wormhole/Dark-Matter).
 - `scripts\phase6_schema.py` — shared schema constants/validators for Phase VI task artifacts.
 - `scripts\task_contract.py` — canonical task contract extraction (objective/constraints/deliverables/verification).
-- `scripts\task_pipeline.py` — per-round planner/executor/verifier pipeline artifact generator.
+- `scripts\task_pipeline.py` — per-round planner/executor/verifier pipeline + deterministic ranking artifacts.
 - `scripts\yeet.ps1` — Sovereign delivery tool (Verified Push).
 - `scripts\slavic_recovery.ps1` — System healing and resurrection.
 
