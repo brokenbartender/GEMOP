@@ -2,9 +2,49 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import time
 from pathlib import Path
 from typing import Any
+
+try:
+    import tomllib  # py3.11+
+except Exception:  # pragma: no cover
+    tomllib = None  # type: ignore
+
+
+def _repo_root() -> Path:
+    v = (os.environ.get("GEMINI_OP_REPO_ROOT") or "").strip()
+    if v:
+        return Path(v).resolve()
+    return Path(__file__).resolve().parents[1]
+
+
+def _load_base_weights() -> dict[str, float]:
+    cfg = _repo_root() / "config" / "dark_matter.toml"
+    defaults = {
+        "safety": 0.35,
+        "efficiency": 0.20,
+        "goal_coherence": 0.25,
+        "verification": 0.20,
+    }
+    if not cfg.exists() or tomllib is None:
+        return defaults
+    try:
+        data = tomllib.loads(cfg.read_text(encoding="utf-8"))
+        bw = (((data or {}).get("dark_matter") or {}).get("base_weights") or {})
+        if not isinstance(bw, dict):
+            return defaults
+        out = dict(defaults)
+        for k in out.keys():
+            if k in bw:
+                try:
+                    out[k] = float(bw[k])
+                except Exception:
+                    pass
+        return out
+    except Exception:
+        return defaults
 
 
 def _latest_supervisor(run_dir: Path) -> dict[str, Any]:
@@ -19,13 +59,8 @@ def _latest_supervisor(run_dir: Path) -> dict[str, Any]:
 
 
 def _derive_weights(supervisor: dict[str, Any]) -> dict[str, float]:
-    # Base latent alignment halo.
-    weights = {
-        "safety": 0.35,
-        "efficiency": 0.20,
-        "goal_coherence": 0.25,
-        "verification": 0.20,
-    }
+    # Base latent alignment halo (config-backed with safe defaults).
+    weights = _load_base_weights()
     verdicts = supervisor.get("verdicts") if isinstance(supervisor.get("verdicts"), list) else []
     mistakes = []
     for v in verdicts:
