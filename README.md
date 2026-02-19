@@ -49,6 +49,8 @@ pwsh .\scripts\summon.ps1 -Task "Fix the failing tests and add coverage for the 
 - `scripts\event_horizon.py` — Schwarzschild-style pre-dispatch context-collapse guard.
 - `scripts\hawking_emitter.py` — failure micro-summary emitter for terminated loops/tasks.
 - `scripts\myth_runtime.py` — consolidated Phase VI plugin dispatcher (Hubble/Wormhole/Dark-Matter).
+- `scripts\task_contract.py` — canonical task contract extraction (objective/constraints/deliverables/verification).
+- `scripts\task_pipeline.py` — per-round planner/executor/verifier pipeline artifact generator.
 - `scripts\yeet.ps1` — Sovereign delivery tool (Verified Push).
 - `scripts\slavic_recovery.ps1` — System healing and resurrection.
 

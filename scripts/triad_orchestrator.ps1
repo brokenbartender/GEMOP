@@ -1015,6 +1015,21 @@ function Generate-RunScaffold {
       $darkMatter = "[DARK MATTER HALO - LATENT ALIGNMENT]`r`n$darkMatter`r`n`r`n"
     }
 
+    $taskContract = Read-Text (Join-Path $RunDir "state\\task_contract.md")
+    if ($taskContract) {
+      if ($taskContract.Length -gt 9000) { $taskContract = $taskContract.Substring(0, 9000) }
+      $taskContract = "[TASK CONTRACT - CANONICAL]`r`n$taskContract`r`n`r`n"
+    }
+
+    $taskPipeline = Read-Text (Join-Path $RunDir ("state\\task_pipeline_round{0}.md" -f $RoundNumber))
+    if (-not $taskPipeline) {
+      $taskPipeline = Read-Text (Join-Path $RunDir "state\\task_pipeline_latest.md")
+    }
+    if ($taskPipeline) {
+      if ($taskPipeline.Length -gt 9000) { $taskPipeline = $taskPipeline.Substring(0, 9000) }
+      $taskPipeline = "[TASK PIPELINE - ROUND PLAN]`r`n$taskPipeline`r`n`r`n"
+    }
+
     $cap = ""
     if ($InjectCapabilityContract) {
       $cap = @"
@@ -1131,7 +1146,7 @@ $pt
     } catch { $targetFiles = "" }
 
     $body = @"
- $facts$repoIndex$targetFiles$retrieval$world$sources$skills$darkMatter$anchor$lessons$header
+ $facts$repoIndex$targetFiles$retrieval$world$sources$skills$darkMatter$taskContract$taskPipeline$anchor$lessons$header
  $cap$supervisorMemo$ownerBlock$onto$misinfo$adv$poison
  [OPERATIONAL CONTEXT]
   REPO_ROOT: $RepoRoot
@@ -1660,6 +1675,8 @@ $wormholeScript = Join-Path $RepoRoot "scripts\wormhole_indexer.py"
 $darkMatterScript = Join-Path $RepoRoot "scripts\dark_matter_halo.py"
 $mythRuntimeScript = Join-Path $RepoRoot "scripts\myth_runtime.py"
 $phase6ContractScript = Join-Path $RepoRoot "scripts\validate_phase6_contracts.py"
+$taskContractScript = Join-Path $RepoRoot "scripts\task_contract.py"
+$taskPipelineScript = Join-Path $RepoRoot "scripts\task_pipeline.py"
 
 # --- Phase VI: Event Horizon (pre-split dense prompts before dispatch) ---
 try {
@@ -1913,6 +1930,48 @@ if ($existingRunnerScripts -and $existingRunnerScripts.Count -gt 0) {
       }
     } catch {
       try { Write-OrchLog -RunDir $RunDir -Msg ("event_horizon_round_prompt_failed round={0} error={1}" -f $r, $_.Exception.Message) } catch { }
+    }
+
+    # Canonical task contract + planner/executor/verifier pipeline for this round.
+    try {
+      if (Test-Path -LiteralPath $taskContractScript) {
+        $tcRaw = & python $taskContractScript --run-dir $RunDir --prompt "$RoundPrompt" --pattern $CouncilPattern --round $r --max-rounds $MaxRounds
+        if ($LASTEXITCODE -ne 0) {
+          throw "task_contract_failed"
+        }
+        Write-OrchLog -RunDir $RunDir -Msg ("task_contract_written round={0}" -f $r)
+      } else {
+        Write-OrchLog -RunDir $RunDir -Msg ("task_contract_missing round={0}" -f $r)
+      }
+
+      if (Test-Path -LiteralPath $taskPipelineScript) {
+        $tpRaw = & python $taskPipelineScript --run-dir $RunDir --round $r --pattern $CouncilPattern --prompt "$RoundPrompt"
+        if ($LASTEXITCODE -ne 0) {
+          throw "task_pipeline_failed"
+        }
+        if ($tpRaw) {
+          try {
+            $tpObj = $tpRaw | ConvertFrom-Json
+            $addon = ""
+            try { $addon = [string]$tpObj.prompt_addendum } catch { $addon = "" }
+            if (-not [string]::IsNullOrWhiteSpace($addon)) {
+              if ($addon.Length -gt 2400) { $addon = $addon.Substring(0, 2400) }
+              $RoundPrompt = "$RoundPrompt`r`n`r`n$addon"
+              Write-OrchLog -RunDir $RunDir -Msg ("task_pipeline_applied round={0} stage={1}" -f $r, $tpObj.stage)
+            }
+          } catch {
+            Write-OrchLog -RunDir $RunDir -Msg ("task_pipeline_parse_failed round={0} error={1}" -f $r, $_.Exception.Message)
+          }
+        }
+      } else {
+        Write-OrchLog -RunDir $RunDir -Msg ("task_pipeline_missing round={0}" -f $r)
+      }
+    } catch {
+      $emsg = $_.Exception.Message
+      Write-OrchLog -RunDir $RunDir -Msg ("task_pipeline_failed round={0} error={1}" -f $r, $emsg)
+      Emit-HawkingRadiation -RepoRoot $RepoRoot -RunDir $RunDir -Reason "task_pipeline_failed" -RoundNumber $r -AgentId 0 -ErrorMsg $emsg
+      Write-StopRequested -RepoRoot $RepoRoot -RunDir $RunDir -Reason ("Task pipeline failed round={0}" -f $r)
+      break
     }
 
     # --- Thermodynamics: Lyapunov Exponent (Hallucination Horizon) ---

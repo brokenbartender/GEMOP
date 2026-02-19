@@ -25,6 +25,8 @@ This document maps the live execution path for GEMOP and records where Phase VI 
 - optional web research ingest
 - skill pack selection
 - retrieval pack generation
+- task contract extraction (`task_contract.py`)
+- task pipeline generation (`task_pipeline.py`)
 - prompt scaffold generation
 - runner script generation
 - agent execution + timeout handling
@@ -59,6 +61,8 @@ Primary run-state files under `<run_dir>/state`:
 - `verify_report.json`
 - `event_horizon.json`
 - `hawking_radiation.jsonl`
+- `task_contract.json`
+- `task_pipeline_roundN.json`
 - `lifecycle_events.jsonl`
 
 Bus artifacts under `<run_dir>/bus`:
