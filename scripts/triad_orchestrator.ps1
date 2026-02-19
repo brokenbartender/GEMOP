@@ -1659,6 +1659,7 @@ $hubbleScript = Join-Path $RepoRoot "scripts\hubble_drift.py"
 $wormholeScript = Join-Path $RepoRoot "scripts\wormhole_indexer.py"
 $darkMatterScript = Join-Path $RepoRoot "scripts\dark_matter_halo.py"
 $mythRuntimeScript = Join-Path $RepoRoot "scripts\myth_runtime.py"
+$phase6ContractScript = Join-Path $RepoRoot "scripts\validate_phase6_contracts.py"
 
 # --- Phase VI: Event Horizon (pre-split dense prompts before dispatch) ---
 try {
@@ -2035,6 +2036,34 @@ if ($existingRunnerScripts -and $existingRunnerScripts.Count -gt 0) {
       }
     } catch {
       try { Write-OrchLog -RunDir $RunDir -Msg ("myth_runtime_failed round={0} error={1}" -f $r, $_.Exception.Message) } catch { }
+    }
+
+    # Strict contract validation for Phase VI outputs (fail-closed).
+    try {
+      if (Test-Path -LiteralPath $phase6ContractScript) {
+        $vraw = & python $phase6ContractScript --run-dir $RunDir --round $r
+        if ($LASTEXITCODE -ne 0) {
+          $msg = "phase6_contract_invalid"
+          try {
+            if ($vraw) {
+              $vobj = $vraw | ConvertFrom-Json
+              if ($vobj -and $vobj.errors) { $msg = ("phase6_contract_invalid errors={0}" -f ((@($vobj.errors) -join ","))) }
+            }
+          } catch { }
+          Write-OrchLog -RunDir $RunDir -Msg ("{0} round={1}" -f $msg, $r)
+          Emit-HawkingRadiation -RepoRoot $RepoRoot -RunDir $RunDir -Reason "phase6_contract_invalid" -RoundNumber $r -AgentId 0 -ErrorMsg $msg
+          Write-StopRequested -RepoRoot $RepoRoot -RunDir $RunDir -Reason ("Phase6 contract invalid round={0}" -f $r)
+          break
+        } else {
+          Write-OrchLog -RunDir $RunDir -Msg ("phase6_contract_ok round={0}" -f $r)
+        }
+      }
+    } catch {
+      $emsg = $_.Exception.Message
+      Write-OrchLog -RunDir $RunDir -Msg ("phase6_contract_check_failed round={0} error={1}" -f $r, $emsg)
+      Emit-HawkingRadiation -RepoRoot $RepoRoot -RunDir $RunDir -Reason "phase6_contract_check_failed" -RoundNumber $r -AgentId 0 -ErrorMsg $emsg
+      Write-StopRequested -RepoRoot $RepoRoot -RunDir $RunDir -Reason ("Phase6 contract check failed round={0}" -f $r)
+      break
     }
 
           # --- Heraclean & Greek Optimization ---
