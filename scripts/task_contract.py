@@ -8,6 +8,8 @@ import time
 from pathlib import Path
 from typing import Any
 
+from phase6_schema import TASK_CONTRACT_SCHEMA_VERSION
+
 
 CONSTRAINT_RE = re.compile(
     r"(?i)\b(must|must not|should|should not|required|requirement|constraint|never|always|exactly|at least|without)\b"
@@ -123,7 +125,7 @@ def build_contract(prompt: str, run_dir: Path, *, pattern: str, round_n: int, ma
         split_required = False
 
     return {
-        "schema_version": 1,
+        "schema_version": TASK_CONTRACT_SCHEMA_VERSION,
         "generated_at": time.time(),
         "pattern": str(pattern or "").strip().lower(),
         "round": int(round_n),

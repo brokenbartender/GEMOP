@@ -105,3 +105,9 @@ Move toward one plugin runtime:
 - `scripts/myth_runtime.py` as a single hook dispatcher
 - shared config for physics/alignment constants
 - one event schema for all lifecycle emissions
+
+## Shared Schema
+
+- `scripts/phase6_schema.py` is the canonical schema validator/constants module for:
+  - `task_contract_roundN.json`
+  - `task_pipeline_roundN.json`

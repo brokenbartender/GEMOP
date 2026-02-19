@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+from phase6_schema import is_num, validate_task_contract_obj, validate_task_pipeline_obj
 
 def _load_json(path: Path) -> dict[str, Any] | None:
     if not path.exists():
@@ -18,14 +19,6 @@ def _load_json(path: Path) -> dict[str, Any] | None:
     return None
 
 
-def _is_num(v: Any) -> bool:
-    return isinstance(v, (int, float)) and not isinstance(v, bool)
-
-
-def _is_str_list(v: Any) -> bool:
-    return isinstance(v, list) and all(isinstance(x, str) and x.strip() for x in v)
-
-
 def _validate_dark_matter(path: Path, errors: list[str]) -> None:
     obj = _load_json(path)
     if obj is None:
@@ -33,7 +26,7 @@ def _validate_dark_matter(path: Path, errors: list[str]) -> None:
         return
     if int(obj.get("schema_version", -1)) != 1:
         errors.append("dark_matter.schema_version")
-    if not _is_num(obj.get("generated_at")):
+    if not is_num(obj.get("generated_at")):
         errors.append("dark_matter.generated_at")
     if not isinstance(obj.get("query"), str):
         errors.append("dark_matter.query")
@@ -45,7 +38,7 @@ def _validate_dark_matter(path: Path, errors: list[str]) -> None:
     keys = ("safety", "efficiency", "goal_coherence", "verification")
     total = 0.0
     for k in keys:
-        if k not in w or not _is_num(w.get(k)):
+        if k not in w or not is_num(w.get(k)):
             errors.append(f"dark_matter.weights.{k}")
             continue
         vv = float(w[k])
@@ -67,7 +60,7 @@ def _validate_myth_runtime(path: Path, round_n: int, errors: list[str]) -> None:
         return
     if int(obj.get("schema_version", -1)) != 1:
         errors.append("myth_runtime.schema_version")
-    if not _is_num(obj.get("generated_at")):
+    if not is_num(obj.get("generated_at")):
         errors.append("myth_runtime.generated_at")
     if int(obj.get("round", -1)) != int(round_n):
         errors.append("myth_runtime.round")
@@ -96,7 +89,7 @@ def _validate_myth_runtime(path: Path, round_n: int, errors: list[str]) -> None:
         rc = row.get("returncode")
         if not isinstance(rc, int):
             errors.append(f"myth_runtime.results[{i}].returncode")
-        if not _is_num(row.get("duration_s")):
+        if not is_num(row.get("duration_s")):
             errors.append(f"myth_runtime.results[{i}].duration_s")
     if not required_steps.issubset(seen_steps):
         errors.append("myth_runtime.results.required_steps")
@@ -107,32 +100,7 @@ def _validate_task_contract(path: Path, round_n: int, errors: list[str]) -> None
     if obj is None:
         errors.append(f"missing_or_invalid_json:{path}")
         return
-    if int(obj.get("schema_version", -1)) != 1:
-        errors.append("task_contract.schema_version")
-    if not _is_num(obj.get("generated_at")):
-        errors.append("task_contract.generated_at")
-    if int(obj.get("round", -1)) != int(round_n):
-        errors.append("task_contract.round")
-    if not isinstance(obj.get("pattern"), str):
-        errors.append("task_contract.pattern")
-    if not isinstance(obj.get("objective"), str) or not str(obj.get("objective")).strip():
-        errors.append("task_contract.objective")
-    if not isinstance(obj.get("prompt_sha256"), str):
-        errors.append("task_contract.prompt_sha256")
-    if not _is_str_list(obj.get("constraints")):
-        errors.append("task_contract.constraints")
-    if not _is_str_list(obj.get("deliverables")):
-        errors.append("task_contract.deliverables")
-    if not _is_str_list(obj.get("verification")):
-        errors.append("task_contract.verification")
-    eh = obj.get("event_horizon")
-    if not isinstance(eh, dict):
-        errors.append("task_contract.event_horizon")
-        return
-    if "mass" in eh and eh.get("mass") is not None and not _is_num(eh.get("mass")):
-        errors.append("task_contract.event_horizon.mass")
-    if not isinstance(eh.get("split_required"), bool):
-        errors.append("task_contract.event_horizon.split_required")
+    errors.extend(validate_task_contract_obj(obj, int(round_n)))
 
 
 def _validate_task_pipeline(path: Path, round_n: int, errors: list[str]) -> None:
@@ -140,31 +108,7 @@ def _validate_task_pipeline(path: Path, round_n: int, errors: list[str]) -> None
     if obj is None:
         errors.append(f"missing_or_invalid_json:{path}")
         return
-    if int(obj.get("schema_version", -1)) != 1:
-        errors.append("task_pipeline.schema_version")
-    if not _is_num(obj.get("generated_at")):
-        errors.append("task_pipeline.generated_at")
-    if int(obj.get("round", -1)) != int(round_n):
-        errors.append("task_pipeline.round")
-    stage = obj.get("stage")
-    allowed = {"planner", "planner_executor", "executor_verifier"}
-    if not isinstance(stage, str) or stage not in allowed:
-        errors.append("task_pipeline.stage")
-    if not isinstance(obj.get("prompt_addendum"), str) or not str(obj.get("prompt_addendum")).strip():
-        errors.append("task_pipeline.prompt_addendum")
-    sf = obj.get("stage_focus")
-    if not isinstance(sf, dict):
-        errors.append("task_pipeline.stage_focus")
-        return
-    for role in ("planner", "executor", "verifier"):
-        row = sf.get(role)
-        if not isinstance(row, dict):
-            errors.append(f"task_pipeline.stage_focus.{role}")
-            continue
-        if not isinstance(row.get("goal"), str) or not str(row.get("goal")).strip():
-            errors.append(f"task_pipeline.stage_focus.{role}.goal")
-        if not _is_str_list(row.get("required")):
-            errors.append(f"task_pipeline.stage_focus.{role}.required")
+    errors.extend(validate_task_pipeline_obj(obj, int(round_n)))
 
 
 def validate(run_dir: Path, round_n: int) -> dict[str, Any]:

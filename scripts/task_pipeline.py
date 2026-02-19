@@ -6,6 +6,8 @@ import time
 from pathlib import Path
 from typing import Any
 
+from phase6_schema import TASK_CONTRACT_SCHEMA_VERSION, TASK_PIPELINE_SCHEMA_VERSION, TASK_PIPELINE_STAGES
+
 
 def _read_json(path: Path) -> dict[str, Any]:
     try:
@@ -98,15 +100,17 @@ def _prompt_addendum(stage: str, contract: dict[str, Any], prompt: str) -> str:
 def build_pipeline(run_dir: Path, pattern: str, round_n: int, prompt: str) -> dict[str, Any]:
     state = run_dir / "state"
     contract = _read_json(state / "task_contract.json")
-    if int(contract.get("schema_version", -1)) != 1:
+    if int(contract.get("schema_version", -1)) != TASK_CONTRACT_SCHEMA_VERSION:
         raise ValueError("missing_or_invalid_task_contract")
 
     stage = _stage_for_round(pattern, round_n)
+    if stage not in TASK_PIPELINE_STAGES:
+        raise ValueError("invalid_task_pipeline_stage")
     stage_focus = _plan_block(stage, contract)
     addendum = _prompt_addendum(stage, contract, prompt)
 
     return {
-        "schema_version": 1,
+        "schema_version": TASK_PIPELINE_SCHEMA_VERSION,
         "generated_at": time.time(),
         "pattern": str(pattern or "").strip().lower(),
         "round": int(round_n),
