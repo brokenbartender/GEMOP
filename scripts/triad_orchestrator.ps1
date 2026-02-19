@@ -356,6 +356,33 @@ function Update-RunLedgerAgentStatus {
   }
 }
 
+function Emit-HawkingRadiation {
+  param(
+    [string]$RepoRoot,
+    [string]$RunDir,
+    [string]$Reason,
+    [int]$RoundNumber = 0,
+    [int]$AgentId = 0,
+    [string]$ErrorMsg = ""
+  )
+  try {
+    $hs = Join-Path $RepoRoot "scripts\\hawking_emitter.py"
+    if (-not (Test-Path -LiteralPath $hs)) { return }
+    $args = @(
+      $hs,
+      "--run-dir", $RunDir,
+      "--source", "triad_orchestrator",
+      "--reason", $Reason,
+      "--agent", "$AgentId",
+      "--round", "$RoundNumber"
+    )
+    if (-not [string]::IsNullOrWhiteSpace($ErrorMsg)) {
+      $args += @("--error", $ErrorMsg)
+    }
+    & python @args | Out-Null
+  } catch { }
+}
+
 function Get-StopFiles([string]$RepoRoot, [string]$RunDir) {
   return @(
     (Join-Path $RepoRoot "STOP_ALL_AGENTS.flag"),
@@ -1611,6 +1638,7 @@ $supervisorOn = $EnableSupervisor -or $EnableCouncilBus
 
 # Script registry: define once so all lifecycle stages use consistent paths.
 $eventHorizonScript = Join-Path $RepoRoot "scripts\event_horizon.py"
+$eventHorizonSchedulerScript = Join-Path $RepoRoot "scripts\event_horizon_scheduler.py"
 $higgsScript = Join-Path $RepoRoot "scripts\higgs_field.py"
 $thermoScript = Join-Path $RepoRoot "scripts\thermodynamics.py"
 $maxwellScript = Join-Path $RepoRoot "scripts\maxwells_demon.py"
@@ -1640,12 +1668,11 @@ try {
         if ($LASTEXITCODE -eq 0 -and $ehRaw) {
             $eh = $ehRaw | ConvertFrom-Json
             if ($eh -and $eh.split_required -and $eh.shards -and $eh.shards.Count -gt 0) {
-                $Prompt = [string]$eh.shards[0]
                 $rs = $null
                 $cr = $null
                 try { $rs = $eh.physics.r_s } catch { }
                 try { $cr = $eh.physics.context_radius_units } catch { }
-                Write-Log ("[EVENT HORIZON] Schwarzschild radius exceeded context radius. Split into {0} shards; executing shard 1 first." -f $eh.shards.Count)
+                Write-Log ("[EVENT HORIZON] Schwarzschild radius exceeded context radius. Split into {0} shards; round scheduler engaged." -f $eh.shards.Count)
                 Write-OrchLog -RunDir $RunDir -Msg ("event_horizon_split policy={0} shards={1} r_s={2} context_radius={3}" -f $ehPolicy, $eh.shards.Count, $rs, $cr)
             } else {
                 $rs = $null
@@ -1869,6 +1896,24 @@ if ($existingRunnerScripts -and $existingRunnerScripts.Count -gt 0) {
       break
     }
 
+    $RoundPrompt = $Prompt
+    try {
+      if (Test-Path -LiteralPath $eventHorizonSchedulerScript) {
+        $ehSchedRaw = & python $eventHorizonSchedulerScript --run-dir $RunDir --round $r --default-prompt "$Prompt"
+        if ($LASTEXITCODE -eq 0 -and $ehSchedRaw) {
+          $ehSched = $ehSchedRaw | ConvertFrom-Json
+          if ($ehSched -and $ehSched.prompt) {
+            $RoundPrompt = [string]$ehSched.prompt
+          }
+          try {
+            Write-OrchLog -RunDir $RunDir -Msg ("event_horizon_round_prompt round={0} split={1} shard_index={2} shard_total={3}" -f $r, $ehSched.split_required, $ehSched.shard_index, $ehSched.shard_total)
+          } catch { }
+        }
+      }
+    } catch {
+      try { Write-OrchLog -RunDir $RunDir -Msg ("event_horizon_round_prompt_failed round={0} error={1}" -f $r, $_.Exception.Message) } catch { }
+    }
+
     # --- Thermodynamics: Lyapunov Exponent (Hallucination Horizon) ---
     if ($r -ge 4 -and (Test-Path $thermoScript)) {
         # Check semantic distance (simulated for now)
@@ -1952,7 +1997,7 @@ if ($existingRunnerScripts -and $existingRunnerScripts.Count -gt 0) {
           try { Write-OrchLog -RunDir $RunDir -Msg ("skills_requested round={0} include={1}" -f $r, $includeCsv) } catch { }
         }
       }
-      Ensure-SkillPack -RepoRoot $RepoRoot -RunDir $RunDir -Prompt $Prompt -MaxSkills $MaxSkills -SkillCharBudget $SkillCharBudget -IncludeSkillsCsv $includeCsv
+      Ensure-SkillPack -RepoRoot $RepoRoot -RunDir $RunDir -Prompt $RoundPrompt -MaxSkills $MaxSkills -SkillCharBudget $SkillCharBudget -IncludeSkillsCsv $includeCsv
     }
 
     # Multi-retriever context pack (bounded): code + docs + memory hits for this task.
@@ -1960,7 +2005,7 @@ if ($existingRunnerScripts -and $existingRunnerScripts.Count -gt 0) {
       $rp = Join-Path $RepoRoot "scripts\\retrieval_pack.py"
       if (Test-Path -LiteralPath $rp) {
         try { Append-LifecycleEvent -RunDir $RunDir -Event "retrieval_pack_start" -RoundNumber $r -AgentId 0 -Details @{} } catch { }
-        & python $rp --repo-root $RepoRoot --run-dir $RunDir --round $r --query $Prompt --max-per-section 20 | Out-Null
+        & python $rp --repo-root $RepoRoot --run-dir $RunDir --round $r --query $RoundPrompt --max-per-section 20 | Out-Null
         Write-OrchLog -RunDir $RunDir -Msg ("retrieval_pack_written round={0}" -f $r)
         try { Append-LifecycleEvent -RunDir $RunDir -Event "retrieval_pack_done" -RoundNumber $r -AgentId 0 -Details @{} } catch { }
       }
@@ -1972,19 +2017,19 @@ if ($existingRunnerScripts -and $existingRunnerScripts.Count -gt 0) {
     # Consolidated mythology/physics plugin runtime for long-range memory and latent alignment.
     try {
       if (Test-Path -LiteralPath $mythRuntimeScript) {
-        & python $mythRuntimeScript --repo-root $RepoRoot --run-dir $RunDir --query $Prompt --round $r | Out-Null
+        & python $mythRuntimeScript --repo-root $RepoRoot --run-dir $RunDir --query $RoundPrompt --round $r | Out-Null
         Write-OrchLog -RunDir $RunDir -Msg ("myth_runtime_done round={0}" -f $r)
       } else {
         if (Test-Path -LiteralPath $hubbleScript) {
-          & python $hubbleScript --repo-root $RepoRoot --run-dir $RunDir --query $Prompt | Out-Null
+          & python $hubbleScript --repo-root $RepoRoot --run-dir $RunDir --query $RoundPrompt | Out-Null
           Write-OrchLog -RunDir $RunDir -Msg ("hubble_drift_written round={0}" -f $r)
         }
         if (Test-Path -LiteralPath $wormholeScript) {
-          & python $wormholeScript --run-dir $RunDir --query $Prompt --max-nodes 10 | Out-Null
+          & python $wormholeScript --run-dir $RunDir --query $RoundPrompt --max-nodes 10 | Out-Null
           Write-OrchLog -RunDir $RunDir -Msg ("wormhole_index_written round={0}" -f $r)
         }
         if (Test-Path -LiteralPath $darkMatterScript) {
-          & python $darkMatterScript --run-dir $RunDir --query $Prompt | Out-Null
+          & python $darkMatterScript --run-dir $RunDir --query $RoundPrompt | Out-Null
           Write-OrchLog -RunDir $RunDir -Msg ("dark_matter_profile_written round={0}" -f $r)
         }
       }
@@ -2008,7 +2053,7 @@ if ($existingRunnerScripts -and $existingRunnerScripts.Count -gt 0) {
             }
           } catch { }
     
-          Generate-RunScaffold -RepoRoot $RepoRoot -RunDir $RunDir -Prompt $Prompt -TeamCsv $Team -Agents $Agents -CouncilPattern $CouncilPattern -InjectLearningHints:$InjectLearningHints -InjectCapabilityContract:$InjectCapabilityContract -AdversaryIds $adversaryIds -AdversaryMode $AdversaryMode -PoisonPath $PoisonPath -PoisonAgent $PoisonAgent -Ontology $Ontology -OntologyOverrideAgent $OntologyOverrideAgent -OntologyOverride $OntologyOverride -MisinformAgent $MisinformAgent -MisinformText $MisinformText -RoundNumber $r
+          Generate-RunScaffold -RepoRoot $RepoRoot -RunDir $RunDir -Prompt $RoundPrompt -TeamCsv $Team -Agents $Agents -CouncilPattern $CouncilPattern -InjectLearningHints:$InjectLearningHints -InjectCapabilityContract:$InjectCapabilityContract -AdversaryIds $adversaryIds -AdversaryMode $AdversaryMode -PoisonPath $PoisonPath -PoisonAgent $PoisonAgent -Ontology $Ontology -OntologyOverrideAgent $OntologyOverrideAgent -OntologyOverride $OntologyOverride -MisinformAgent $MisinformAgent -MisinformText $MisinformText -RoundNumber $r
           Ensure-RunnerScripts -RepoRoot $RepoRoot -RunDir $RunDir -RoundNumber $r -AgentCount $agentCount
         # A2A-style "Agent Cards" (capability advertisement): roles + routing tier + shared tools/skills.
     try {
@@ -2343,6 +2388,7 @@ if ($existingRunnerScripts -and $existingRunnerScripts.Count -gt 0) {
       } catch {
         Write-OrchLog -RunDir $RunDir -Msg ("verify_pipeline_failed round={0} error={1}" -f $r, $_.Exception.Message)
         try { Append-LifecycleEvent -RunDir $RunDir -Event "verify_pipeline_failed" -RoundNumber $r -AgentId 0 -Details @{ error = $_.Exception.Message } } catch { }
+        Emit-HawkingRadiation -RepoRoot $RepoRoot -RunDir $RunDir -Reason "verify_pipeline_failed" -RoundNumber $r -AgentId 0 -ErrorMsg $_.Exception.Message
         Write-StopRequested -RepoRoot $RepoRoot -RunDir $RunDir -Reason ("verify_failed round={0}" -f $r)
       }
     }
@@ -2383,6 +2429,7 @@ if ($existingRunnerScripts -and $existingRunnerScripts.Count -gt 0) {
             if ($LASTEXITCODE -ne 0) {
                 Write-Log "[REN] IDENTITY VIOLATION DETECTED. Aborting run to prevent hijack."
                 Write-OrchLog -RunDir $RunDir -Msg "ren_violation round=$r"
+                Emit-HawkingRadiation -RepoRoot $RepoRoot -RunDir $RunDir -Reason "ren_identity_violation" -RoundNumber $r -AgentId 0
                 Write-StopRequested -RepoRoot $RepoRoot -RunDir $RunDir -Reason "Ren: Identity compromise"
                 break
             }
@@ -2715,6 +2762,7 @@ try {
 if ($FailClosedOnThreshold -and ($finalAvg -lt $Threshold)) {
   Write-Log "FAIL (threshold)"
   Write-OrchLog -RunDir $RunDir -Msg "exit fail_threshold"
+  Emit-HawkingRadiation -RepoRoot $RepoRoot -RunDir $RunDir -Reason "fail_threshold" -RoundNumber 0 -AgentId 0 -ErrorMsg ("final_avg={0} threshold={1}" -f $finalAvg, $Threshold)
   exit 1
 }
 
