@@ -29,11 +29,55 @@ class Phase6ContractValidationTests(unittest.TestCase):
             timeout=30,
         )
 
+    def _run_contract_pipeline_builders(self, run_dir: Path, round_n: int, prompt: str) -> None:
+        cp_task = subprocess.run(
+            [
+                os.fspath(Path(sys.executable)),
+                os.fspath(REPO_ROOT / "scripts" / "task_contract.py"),
+                "--run-dir",
+                os.fspath(run_dir),
+                "--prompt",
+                prompt,
+                "--pattern",
+                "debate",
+                "--round",
+                str(round_n),
+                "--max-rounds",
+                "3",
+            ],
+            cwd=str(REPO_ROOT),
+            text=True,
+            capture_output=True,
+            timeout=60,
+        )
+        self.assertEqual(cp_task.returncode, 0, msg=cp_task.stderr or cp_task.stdout)
+
+        cp_pipeline = subprocess.run(
+            [
+                os.fspath(Path(sys.executable)),
+                os.fspath(REPO_ROOT / "scripts" / "task_pipeline.py"),
+                "--run-dir",
+                os.fspath(run_dir),
+                "--round",
+                str(round_n),
+                "--pattern",
+                "debate",
+                "--prompt",
+                prompt,
+            ],
+            cwd=str(REPO_ROOT),
+            text=True,
+            capture_output=True,
+            timeout=60,
+        )
+        self.assertEqual(cp_pipeline.returncode, 0, msg=cp_pipeline.stderr or cp_pipeline.stdout)
+
     def test_validator_passes_with_valid_contracts(self) -> None:
         with tempfile.TemporaryDirectory(prefix="gemop_p6_valid_") as td:
             run_dir = Path(td).resolve()
             state = run_dir / "state"
             state.mkdir(parents=True, exist_ok=True)
+            prompt = "validate contracts"
 
             # Generate valid artifacts through real scripts.
             cp1 = subprocess.run(
@@ -45,7 +89,7 @@ class Phase6ContractValidationTests(unittest.TestCase):
                     "--run-dir",
                     os.fspath(run_dir),
                     "--query",
-                    "validate contracts",
+                    prompt,
                     "--round",
                     "1",
                 ],
@@ -55,6 +99,7 @@ class Phase6ContractValidationTests(unittest.TestCase):
                 timeout=60,
             )
             self.assertEqual(cp1.returncode, 0, msg=cp1.stderr)
+            self._run_contract_pipeline_builders(run_dir, 1, prompt)
 
             cp = self._run_validator(run_dir, 1)
             self.assertEqual(cp.returncode, 0, msg=cp.stderr or cp.stdout)
