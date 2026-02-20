@@ -8,9 +8,12 @@ param(
   [switch]$Brain, # Canonical: Sovereign Brain + Executive Core
   [switch]$Mouth, # Single interactive terminal -> NeuralBus -> Executive Core (recommended day-to-day)
   [switch]$AutoApplyPatches, # Council mode: auto-apply ```diff blocks (fail-closed) after implementation rounds.
+  [switch]$AutoApplyMcpCapabilities, # Council mode: permit MCP capability auto-apply flow.
   [switch]$StopOthers, # Stop prior agent processes before starting a new council run.
   [string]$Team = "Architect,Engineer,Tester", # Council mode: CSV team roles (used when -Agents=0).
   [int]$Agents = 0, # Council mode: explicit agent count (overrides -Team roles list).
+  [switch]$AutoTeam, # Council mode: compile role team from prompt before dispatch.
+  [int]$MaxTeamSize = 7, # Council mode: upper bound for AutoTeam role count.
   [int]$MaxRounds = 2, # Council mode: debate rounds (debate uses R1 design, R2+ implement).
   [int]$MaxParallel = 3, # Council mode: max concurrent agent processes spawned.
   [int]$AgentTimeoutSec = 900, # Council mode: max wall time per agent process (prevents hangs).
@@ -25,8 +28,14 @@ param(
   [switch]$RequireDecisionJson, # Council mode: stop run if DECISION_JSON is missing.
   [switch]$VerifyAfterPatches, # Council mode: run verification pipeline after implementation rounds.
   [switch]$AdaptiveConcurrency, # Council mode: reduce parallelism when overload/latency is detected.
+  [switch]$Autonomous, # Council mode: unattended resilience/ownership behavior.
+  [switch]$RequireApproval, # Council mode: HITL approval gate for sensitive actions.
+  [switch]$RequireGrounding, # Council mode: require grounding before patch apply.
+  [int]$ContractRepairAttempts = 1, # Council mode: retries for missing contract artifacts.
   [string]$ResearchUrls = "", # Council mode: safe URL fetch before Round 1 (when -Online).
   [string]$ResearchUrlsFile = "", # Council mode: file of URLs (one per line) to fetch before Round 1.
+  [string]$ResearchQuery = "", # Council mode: search query for Round-1 research ingest.
+  [int]$ResearchMaxResults = 8, # Council mode: max search results for ResearchQuery.
   [switch]$SaveTokens,
   [switch]$Dashboard,
   [switch]$SkipDocCheck,
@@ -179,22 +188,30 @@ if ($Council) {
         "-MaxRounds", "$MaxRounds",
         "-EnableCouncilBus",
         "-InjectLearningHints",
+        "-InjectCapabilityContract",
         "-MaxParallel", "$MaxParallel",
         "-AgentTimeoutSec", "$AgentTimeoutSec",
         "-AgentsPerConsole", "2",
         "-CloudSeats", "$CloudSeats",
-        "-MaxLocalConcurrency", "$MaxLocalConcurrency"
+        "-MaxLocalConcurrency", "$MaxLocalConcurrency",
+        "-ContractRepairAttempts", "$ContractRepairAttempts"
     )
     if ($FailClosedOnThreshold) { $args += @("-FailClosedOnThreshold", "-Threshold", "$Threshold") }
     if ($Online) { $args += "-Online" }
     if ($AutoApplyPatches) { $args += "-AutoApplyPatches" }
+    if ($AutoApplyMcpCapabilities) { $args += "-AutoApplyMcpCapabilities" }
+    if ($AutoTeam) { $args += @("-AutoTeam", "-MaxTeamSize", "$MaxTeamSize") }
     if ($Resume) { $args += "-Resume" }
     if ($ExtractDecisions) { $args += "-ExtractDecisions" }
     if ($RequireDecisionJson) { $args += "-RequireDecisionJson" }
     if ($VerifyAfterPatches) { $args += "-VerifyAfterPatches" }
     if ($AdaptiveConcurrency) { $args += "-AdaptiveConcurrency" }
+    if ($Autonomous) { $args += "-Autonomous" }
+    if ($RequireApproval) { $args += "-RequireApproval" }
+    if ($RequireGrounding) { $args += "-RequireGrounding" }
     if ($ResearchUrls) { $args += @("-ResearchUrls", $ResearchUrls) }
     if ($ResearchUrlsFile) { $args += @("-ResearchUrlsFile", $ResearchUrlsFile) }
+    if ($ResearchQuery) { $args += @("-ResearchQuery", $ResearchQuery, "-ResearchMaxResults", "$ResearchMaxResults") }
     if ($QuotaCloudCalls -gt 0) { $args += @("-QuotaCloudCalls", "$QuotaCloudCalls") }
     if ($QuotaCloudCallsPerAgent -gt 0) { $args += @("-QuotaCloudCallsPerAgent", "$QuotaCloudCallsPerAgent") }
     if ($Prompt) { $args += @("-Prompt", $Prompt) }

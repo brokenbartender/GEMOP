@@ -27,6 +27,10 @@ def _today_local() -> str:
 
 
 def default_budget_path() -> Path:
+    # Allow environment override for workspace-local testing or restricted environments
+    env_path = os.environ.get("GEMINI_OP_BUDGET_PATH", "").strip()
+    if env_path:
+        return Path(env_path).expanduser().resolve()
     # User requested ".Gemini/budget_tracking.json". This is the shared location across sessions.
     return Path(os.path.expanduser(r"~\.Gemini\budget_tracking.json"))
 
@@ -88,8 +92,15 @@ def load_budget(path: Path) -> Dict[str, Any]:
             "events": [],
         }
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
-    except Exception:
+        raw = path.read_text(encoding="utf-8")
+        data = json.loads(raw)
+        # Debug trace for troubleshooting environment-specific blocks
+        if os.environ.get("GEMINI_OP_GOV_DEBUG") == "1":
+            print(f"[DEBUG] load_budget path={path} limit={data.get('daily_limit_usd')} spent={data.get('spent_today_usd')}")
+        return data
+    except Exception as e:
+        if os.environ.get("GEMINI_OP_GOV_DEBUG") == "1":
+            print(f"[DEBUG] load_budget error path={path} err={e}")
         # Corrupt file: fail closed by treating as over budget until fixed.
         return {
             "date": _today_local(),
@@ -157,7 +168,17 @@ def check_budget(budget_path: Path, additional_spend_usd: float = 0.0) -> bool:
     Return True if allowed to proceed given daily budget, otherwise False.
     A daily_limit_usd of 0 means "no spend allowed" (fail closed).
     """
-    data = rotate_budget_if_new_day(load_budget(budget_path))
+    data = load_budget(budget_path)
+    today = _today_local()
+    if data.get("date") != today:
+        data = {
+            "date": today,
+            "daily_limit_usd": float(data.get("daily_limit_usd") or 0.0),
+            "spent_today_usd": 0.0,
+            "events": [],
+        }
+        save_budget(budget_path, data)
+        
     limit = float(data.get("daily_limit_usd") or 0.0)
     spent = float(data.get("spent_today_usd") or 0.0)
     # Fail closed: require explicit positive limit to allow spend.
@@ -406,6 +427,8 @@ def main() -> None:
             approval_token=str(args.approval_token or ""),
             write_audit=True,
         )
+        if not ok:
+            print(f"BLOCKED ({args.action}): Policy gate refused action.")
         raise SystemExit(0 if ok else 2)
 
     if args.cmd == "record-spend":

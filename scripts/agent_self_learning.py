@@ -436,6 +436,10 @@ def parse_args() -> argparse.Namespace:
     s_score = sub.add_parser("score-run", help="Score one run directory")
     s_score.add_argument("--run-dir", default="")
 
+    s_round = sub.add_parser("score-round", help="Score a specific round in a run directory")
+    s_round.add_argument("--run-dir", default="")
+    s_round.add_argument("--round", type=int, default=0, help="Optional round number filter (currently treated as score-run)")
+
     s_learn = sub.add_parser("learn", help="Generate lessons/model updates from latest scores")
     s_learn.add_argument("--run-dir", default="")
     s_learn.add_argument("--threshold", type=int, default=70)
@@ -459,7 +463,7 @@ def main() -> None:
     if not run_dir.exists():
         raise SystemExit(f"Run dir not found: {run_dir}")
 
-    if args.cmd == "score-run":
+    if args.cmd in ("score-run", "score-round"):
         out = run_score(run_dir)
         print(json.dumps(out["summary"], indent=2))
         return

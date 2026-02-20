@@ -1,13 +1,14 @@
 import argparse
 import datetime as dt
 import json
+import os
 import shutil
 import sys
 from pathlib import Path
 from typing import Dict, Optional
 
 
-REPO_ROOT = Path(os.environ.get("GEMINI_OP_REPO_ROOT", Path(__file__).resolve().parent.parent))
+REPO_ROOT = Path(os.environ.get("GEMINI_OP_REPO_ROOT", Path(__file__).resolve().parents[2]))
 INBOX_DIR = REPO_ROOT / "ramshare" / "evidence" / "inbox"
 PROCESSED_DIR = REPO_ROOT / "ramshare" / "evidence" / "processed"
 AUDIT_LOG = REPO_ROOT / "ramshare" / "evidence" / "audit_log.md"
@@ -36,14 +37,18 @@ def append_audit(line: str) -> None:
 
 def extract_first_trend(report_path: Path) -> Optional[str]:
     txt = report_path.read_text(encoding="utf-8", errors="ignore")
+    in_hot_trends = False
     for raw in txt.splitlines():
         line = raw.strip()
+        if line.lower().startswith("## hot trends"):
+            in_hot_trends = True
+            continue
+        if line.startswith("## ") and in_hot_trends:
+            break
+        if not in_hot_trends:
+            continue
         if line.startswith("- "):
             item = line[2:].strip()
-            # Skip obvious metadata bullets
-            low = item.lower()
-            if low.startswith("job_id:") or low.startswith("generated_at:"):
-                continue
             if item:
                 return item
     return None
@@ -137,6 +142,40 @@ def has_today_alpha_report() -> bool:
     return False
 
 
+def has_today_finance_council_report() -> bool:
+    if not REPORTS_DIR.exists():
+        return False
+    today = today_local()
+    for p in REPORTS_DIR.glob("finance_council_*.json"):
+        try:
+            data = load_json(p)
+            ts = str(data.get("generated_at") or "")
+            if ts and dt.datetime.fromisoformat(ts).astimezone().date().isoformat() == today:
+                return True
+        except Exception:
+            continue
+    return False
+
+
+def has_today_trend_report() -> bool:
+    today = today_local()
+    for p in INBOX_DIR.glob("report_trends_*.md"):
+        try:
+            mtime = dt.datetime.fromtimestamp(p.stat().st_mtime).astimezone()
+            if mtime.date().isoformat() == today:
+                return True
+        except Exception:
+            continue
+    for p in PROCESSED_DIR.glob("report_trends_*.md"):
+        try:
+            mtime = dt.datetime.fromtimestamp(p.stat().st_mtime).astimezone()
+            if mtime.date().isoformat() == today:
+                return True
+        except Exception:
+            continue
+    return False
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description="Manager skill: promote trend report into product_drafter job")
     ap.add_argument("job_file", help="Path to manager job json (currently not used deeply; reserved for config)")
@@ -147,6 +186,20 @@ def main() -> None:
     PROCESSED_DIR.mkdir(parents=True, exist_ok=True)
 
     promoted_any = False
+
+    # Free POD pipeline seed: run trend discovery daily.
+    if not has_today_trend_report() and not inbox_has_task("trend_spotter"):
+        job = {
+            "id": f"auto-trend-spotter-{now_stamp()}",
+            "task_type": "trend_spotter",
+            "target_profile": "research",
+            "policy": {"risk": "low", "estimated_spend_usd": 0},
+        }
+        out = INBOX_DIR / f"job.auto_trend_spotter_{now_stamp()}.json"
+        out.write_text(json.dumps(job, indent=2), encoding="utf-8")
+        append_audit("Scheduled Trend Spotter job for fresh creative leads")
+        print(f"Manager scheduled trend spotter job: {out}")
+        promoted_any = True
 
     # Phase 15 orchestration: schedule strategist first, then analyst.
     if not market_context_is_fresh_today() and not inbox_has_task("market_strategist"):
@@ -193,6 +246,30 @@ def main() -> None:
             append_audit("Scheduled Alpha Report job for daily performance analytics")
             print(f"Manager scheduled alpha report job: {out}")
             promoted_any = True
+
+    # Finance council synthesis: combine technical/fundamental/sentiment/risk/execution in one report.
+    if (
+        market_context_is_fresh_today()
+        and has_today_market_analysis_for(first_portfolio_symbol())
+        and not has_today_finance_council_report()
+        and not inbox_has_task("finance_council")
+    ):
+        job = {
+            "id": f"auto-finance-council-{now_stamp()}",
+            "task_type": "finance_council",
+            "target_profile": "fidelity",
+            "inputs": {
+                "emit_paper_jobs": False,
+                "launch_council": False,
+                "max_symbols": 6,
+            },
+            "policy": {"risk": "high", "estimated_spend_usd": 0},
+        }
+        out = INBOX_DIR / f"job.auto_finance_council_{now_stamp()}.json"
+        out.write_text(json.dumps(job, indent=2), encoding="utf-8")
+        append_audit("Scheduled Finance Council job after context + analysis refresh")
+        print(f"Manager scheduled finance council job: {out}")
+        promoted_any = True
 
     reports = sorted(INBOX_DIR.glob("report_trends_*.md"))
 

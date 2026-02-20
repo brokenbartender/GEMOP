@@ -72,10 +72,15 @@ def _default_service_router(*, online: bool) -> Dict[str, Any]:
         "online": bool(online),
         "roles": {
             # High-leverage reasoning seats.
-            "Architect": {"tier": "cloud", "providers": ["cloud_gemini"]},
-            "ResearchLead": {"tier": "cloud", "providers": ["cloud_gemini"]},
-            "Engineer": {"tier": "cloud", "providers": ["cloud_gemini"]},
-            "Security": {"tier": "cloud", "providers": ["cloud_gemini"]},
+            "Architect": {"tier": "cloud", "providers": ["cloud_codex_cli", "cloud_gemini", "cloud_gemini_cli"]},
+            "ResearchLead": {"tier": "cloud", "providers": ["cloud_gemini", "cloud_codex_cli", "cloud_gemini_cli"]},
+            "Engineer": {"tier": "cloud", "providers": ["cloud_gemini", "cloud_codex_cli", "cloud_gemini_cli"]},
+            "Security": {"tier": "cloud", "providers": ["cloud_codex_cli", "cloud_gemini", "cloud_gemini_cli"]},
+            "CodexReviewer": {"tier": "cloud", "providers": ["cloud_codex_cli", "cloud_gemini_cli", "cloud_gemini"]},
+            "Operator": {"tier": "cloud", "providers": ["cloud_gemini", "cloud_codex_cli", "cloud_gemini_cli"]},
+            "Auditor": {"tier": "flash", "providers": ["local_ollama", "cloud_gemini_cli"]},
+            "MultimediaDirector": {"tier": "cloud", "providers": ["cloud_gemini", "cloud_codex_cli", "cloud_gemini_cli"]},
+            "RedTeam": {"tier": "ultra", "providers": ["cloud_gemini", "cloud_codex_cli"]},
             # Precision / cost-controlled seats.
             "Tester": {"tier": "local", "providers": ["local_ollama"]},
             "Critic": {"tier": "local", "providers": ["local_ollama"]},
@@ -124,6 +129,7 @@ def main() -> int:
     ap.add_argument("--max-rounds", type=int, default=2)
     ap.add_argument("--online", action="store_true")
     ap.add_argument("--cloud-seats", type=int, default=3)
+    ap.add_argument("--codex-seats", type=int, default=0)
     ap.add_argument("--max-local-concurrency", type=int, default=2)
     ap.add_argument("--quota-cloud-calls", type=int, default=0)
     ap.add_argument("--quota-cloud-calls-per-agent", type=int, default=0)
@@ -152,6 +158,7 @@ def main() -> int:
         "online": bool(args.online),
         "routing": {
             "cloud_seats": int(args.cloud_seats),
+            "codex_seats": int(args.codex_seats),
             "max_local_concurrency": int(args.max_local_concurrency),
             "cloud_spillover": bool(args.online),  # controlled by orchestrator env when -Online
         },

@@ -246,7 +246,12 @@ def parse_job(path: Path) -> Job:
     default_profiles = {
         "uploader": "ops",
         "fidelity_trader": "fidelity",
+        "fidelity_profile": "fidelity",
+        "fidelity_intake": "fidelity",
+        "finance_council": "fidelity",
+        "market_theme_research": "fidelity",
         "bio_skill_implementer": "research",
+        "art_syndicate": "research",
     }
     default_profile = default_profiles.get(task_type, "research")
     target_profile = str(data.get("target_profile") or default_profile)
@@ -321,6 +326,10 @@ def execute_job(job: Job) -> int:
         "market_analyst": REPO_ROOT / "ramshare" / "skills" / "skill_market_analyst.py",
         "alpha_report": REPO_ROOT / "ramshare" / "skills" / "skill_alpha_report.py",
         "fidelity_trader": REPO_ROOT / "ramshare" / "skills" / "skill_fidelity_trader.py",
+        "fidelity_profile": REPO_ROOT / "ramshare" / "skills" / "skill_fidelity_profile.py",
+        "fidelity_intake": REPO_ROOT / "ramshare" / "skills" / "skill_fidelity_intake.py",
+        "finance_council": REPO_ROOT / "ramshare" / "skills" / "skill_finance_council.py",
+        "market_theme_research": REPO_ROOT / "ramshare" / "skills" / "skill_market_theme_research.py",
         "trend_spotter": REPO_ROOT / "ramshare" / "skills" / "skill_trend_spotter.py",
         "product_drafter": REPO_ROOT / "ramshare" / "skills" / "skill_product_drafter.py",
         "librarian": REPO_ROOT / "ramshare" / "skills" / "skill_librarian.py",
@@ -329,6 +338,7 @@ def execute_job(job: Job) -> int:
         "manager": REPO_ROOT / "ramshare" / "skills" / "skill_manager.py",
         "strategist": REPO_ROOT / "ramshare" / "skills" / "skill_strategist.py",
         "uploader": REPO_ROOT / "ramshare" / "skills" / "skill_uploader.py",
+        "art_syndicate": REPO_ROOT / "ramshare" / "skills" / "skill_art_syndicate.py",
         "bio_skill_implementer": REPO_ROOT / "ramshare" / "skills" / "skill_bio_skill.py",
     }
 

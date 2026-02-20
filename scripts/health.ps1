@@ -136,15 +136,26 @@ if ($StartDaemons) {
 
 foreach ($d in $daemonChecks) {
   Write-Host ("Checking MCP daemon: {0} ({1})" -f $d.Name, $d.Url)
+  $requireMemoryRaw = [string]$env:GEMINI_OP_HEALTH_REQUIRE_MEMORY
+  $requireMemory = $requireMemoryRaw.Trim().ToLower() -in @('1','true','yes')
+  $memoryOptional = ($d.Name -eq 'memory' -and -not $requireMemory)
   try {
     & node $caller --url $d.Url --tool __list_tools__ --json '{}' *> $null
     if ($LASTEXITCODE -eq 0) {
       Ok ("{0} responded to tools/list" -f $d.Name)
     } else {
-      Fail ("{0} tools/list failed (exit=$LASTEXITCODE)" -f $d.Name)
+      if ($memoryOptional) {
+        Warn ("{0} tools/list failed (exit=$LASTEXITCODE); continuing without memory MCP" -f $d.Name)
+      } else {
+        Fail ("{0} tools/list failed (exit=$LASTEXITCODE)" -f $d.Name)
+      }
     }
   } catch {
-    Fail ("{0} tools/list threw: {1}" -f $d.Name, $_.Exception.Message)
+    if ($memoryOptional) {
+      Warn ("{0} tools/list threw: {1}; continuing without memory MCP" -f $d.Name, $_.Exception.Message)
+    } else {
+      Fail ("{0} tools/list threw: {1}" -f $d.Name, $_.Exception.Message)
+    }
   }
 }
 

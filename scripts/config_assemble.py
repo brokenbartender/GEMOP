@@ -68,9 +68,11 @@ def main() -> int:
     if out_path.exists():
         existing = out_path.read_text(encoding="utf-8", errors="ignore")
         if existing == text:
+            print(f"Config up-to-date: {out_path.name}")
             return 0
 
     out_path.write_text(text, encoding="utf-8")
+    print(f"Config assembled: {out_path.name}")
     return 0
 
 

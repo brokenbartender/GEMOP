@@ -9,6 +9,9 @@ This folder defines the declarative multi-agent system:
 
 Generation:
 - Use `python scripts/agent_pack_generate.py` to generate an orchestrator-compatible run directory under `.agent-jobs/`.
+- Example:
+  - `python scripts/agent_pack_generate.py --pack redbubble_os --task "Build an upload-ready niche plan"`
+  - `pwsh .\scripts\triad_orchestrator.ps1 -RepoRoot (Resolve-Path .) -RunDir .\.agent-jobs\<run_id>`
 
 Design principles:
 - Roles are reusable; packs are ordered compositions.

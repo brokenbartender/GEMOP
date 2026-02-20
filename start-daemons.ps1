@@ -67,14 +67,20 @@ if ($Profile -in @('browser','research','fidelity','full')) {
   if (!(Test-Path $dataDir)) { New-Item -ItemType Directory -Force -Path $dataDir | Out-Null }
   $memoryFile = Join-Path $dataDir 'memory.jsonl'
 
-  # Use pinkpixel memory server for better reliability
-  $memoryArgs = @('/c', "node ""$proxyScript"" --command npx --name memory --port 3013 --endpoint /mcp --args ""-y @pinkpixel/memory-mcp@latest"" --env MEMORY_FILE_PATH=""$memoryFile""")
+  # Memory daemon (official package path). Keep fail-open behavior if unavailable.
+  $memoryOut = (Join-Path $logDir 'memory-daemon.out.log')
+  $memoryErr = (Join-Path $logDir 'memory-daemon.err.log')
+  $memoryArgs = @('/c', "node ""$proxyScript"" --command npx --name memory --port 3013 --endpoint /mcp --args ""-y -p zod -p @modelcontextprotocol/server-memory mcp-server-memory"" --env MEMORY_FILE_PATH=""$memoryFile""")
   Ensure-ProcessOnPort -Port 3013 -Name 'memory' `
     -FilePath 'cmd.exe' `
     -ArgumentList $memoryArgs `
     -WorkingDirectory $proxyWorkDir `
-    -StdoutPath (Join-Path $logDir 'memory-daemon.out.log') `
-    -StderrPath (Join-Path $logDir 'memory-daemon.err.log')
+    -StdoutPath $memoryOut `
+    -StderrPath $memoryErr
+
+  if (-not (Test-Listening 3013)) {
+    Write-Warning "memory daemon unavailable; continuing without memory MCP for this session."
+  }
 
   Ensure-ProcessOnPort -Port 8931 -Name 'playwright' `
     -FilePath 'cmd.exe' `

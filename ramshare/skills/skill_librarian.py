@@ -1,11 +1,12 @@
 import argparse
 import datetime as dt
 import json
+import os
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
 
-REPO_ROOT = Path(os.environ.get("GEMINI_OP_REPO_ROOT", Path(__file__).resolve().parent.parent))
+REPO_ROOT = Path(os.environ.get("GEMINI_OP_REPO_ROOT", Path(__file__).resolve().parents[2]))
 STATE_DIR = REPO_ROOT / "ramshare" / "state"
 MEMORY_DIR = REPO_ROOT / "ramshare" / "evidence" / "memory"
 HISTORY_PATH = STATE_DIR / "product_history.json"

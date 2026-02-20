@@ -295,6 +295,51 @@ def cmd_resolve(args: argparse.Namespace) -> None:
     print(json.dumps({"ok": True, "proposal_id": args.proposal_id, "decision": dec}, indent=2))
 
 
+def cmd_signal(args: argparse.Namespace) -> None:
+    """Emit a digital pheromone (low-overhead signaling)."""
+    run_dir = Path(args.run_dir).resolve()
+    append_jsonl(
+        messages_path(run_dir),
+        {
+            "id": str(uuid.uuid4()),
+            "ts": now_ts(),
+            "from": args.agent,
+            "to": "quorum",
+            "intent": "pheromone",
+            "type": args.type,
+            "strength": float(args.strength or 1.0),
+            "ttl_sec": int(args.ttl_sec or 300),
+            "expires_at": now_ts() + int(args.ttl_sec or 300),
+            "payload": {"note": args.note or ""},
+        },
+    )
+    print(json.dumps({"ok": True, "type": args.type}, indent=2))
+
+
+def cmd_sense(args: argparse.Namespace) -> None:
+    """Check if a pheromone quorum has been reached."""
+    run_dir = Path(args.run_dir).resolve()
+    messages = load_messages(messages_path(run_dir))
+    t = now_ts()
+    
+    # Aggregate active pheromones by type
+    signals = {}
+    for m in messages:
+        if m.get("intent") == "pheromone" and float(m.get("expires_at", 0)) > t:
+            ptype = m.get("type")
+            signals[ptype] = signals.get(ptype, 0.0) + float(m.get("strength", 0.0))
+    
+    # Check threshold (default to 2.5 strength for collective pivot)
+    threshold = float(args.threshold or 2.5)
+    active_quorums = {k: v for k, v in signals.items() if v >= threshold}
+    
+    print(json.dumps({
+        "ok": True, 
+        "active_quorums": active_quorums,
+        "signals": signals
+    }, indent=2))
+
+
 def cmd_status(args: argparse.Namespace) -> None:
     run_dir = Path(args.run_dir).resolve()
     rows = load_messages(messages_path(run_dir))
@@ -489,6 +534,20 @@ def build_parser() -> argparse.ArgumentParser:
     p_res.add_argument("--run-dir", required=True)
     p_res.add_argument("--proposal-id", required=True)
     p_res.set_defaults(func=cmd_resolve)
+
+    p_sig = sub.add_parser("signal")
+    p_sig.add_argument("--run-dir", required=True)
+    p_sig.add_argument("--agent", required=True)
+    p_sig.add_argument("--type", required=True, help="e.g. error_high, news_found, security_trip")
+    p_sig.add_argument("--strength", type=float, default=1.0)
+    p_sig.add_argument("--ttl-sec", type=int, default=300)
+    p_sig.add_argument("--note", default="")
+    p_sig.set_defaults(func=cmd_signal)
+
+    p_sen = sub.add_parser("sense")
+    p_sen.add_argument("--run-dir", required=True)
+    p_sen.add_argument("--threshold", type=float, default=2.5)
+    p_sen.set_defaults(func=cmd_sense)
 
     p_status = sub.add_parser("status")
     p_status.add_argument("--run-dir", required=True)

@@ -1,4 +1,0 @@
-  File "C:\Users\codym\gemini-op-clean\scripts\procrustes_normalize.py", line 13
-    text = text[:(token_limit * 4)] + "
-                                      ^
-SyntaxError: unterminated string literal (detected at line 13)

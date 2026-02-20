@@ -108,15 +108,15 @@ const downstreamReady = downstream.connect(transport).catch((err) => {
   downstreamConnectError = err;
   // eslint-disable-next-line no-console
   console.error('Downstream connect failed:', err);
-  throw err;
+  return null;
 });
 
 async function ensureDownstream(extra) {
+  // Wait for stdio transport + MCP initialization to complete.
+  await downstreamReady;
   if (downstreamConnectError) {
     throw downstreamConnectError;
   }
-  // Wait for stdio transport + MCP initialization to complete.
-  await downstreamReady;
   return extra;
 }
 
@@ -298,4 +298,10 @@ process.on('SIGINT', async () => {
     }
     process.exit(0);
   }
+});
+
+process.on('unhandledRejection', (reason) => {
+  // Keep proxy alive; request handlers already surface downstream errors.
+  // eslint-disable-next-line no-console
+  console.error('Unhandled rejection:', reason);
 });

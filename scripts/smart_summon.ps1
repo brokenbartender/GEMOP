@@ -18,6 +18,7 @@ param(
 
     [switch]$Online,
     [switch]$AutoApplyPatches,
+    [switch]$VerifyAfterPatches,
     [switch]$Yeet,
     [string]$TargetRepo = "",
     [switch]$Assimilate
@@ -30,21 +31,25 @@ Write-Host "[Smart] Analyzing task to compile the perfect team..." -ForegroundCo
 
 # 1. Compile Team
 $compilerScript = Join-Path $RepoRoot "scripts\team_compiler.py"
+$useAutoTeamFallback = $false
+$teamList = ""
 try {
     $json = python $compilerScript --prompt "$Task"
     $data = $json | ConvertFrom-Json
 } catch {
-    Write-Error "Failed to compile team: $_"
-    exit 1
+    Write-Warning "Team compiler failed, falling back to orchestrator AutoTeam: $($_.Exception.Message)"
+    $useAutoTeamFallback = $true
 }
 
-if (-not $data.ok) {
-    Write-Error "Team compiler returned error status."
-    exit 1
+if (-not $useAutoTeamFallback) {
+    if (-not $data.ok -or -not $data.roles) {
+        Write-Warning "Team compiler returned no usable roles, falling back to orchestrator AutoTeam."
+        $useAutoTeamFallback = $true
+    } else {
+        $teamList = $data.roles -join ","
+        Write-Host "[Smart] Selected Team: $teamList" -ForegroundColor Green
+    }
 }
-
-$teamList = $data.roles -join ","
-Write-Host "[Smart] Selected Team: $teamList" -ForegroundColor Green
 
 # 2. Invoke Summon
 $maxRounds = 2
@@ -55,12 +60,18 @@ if ($AutoApplyPatches -or $Task -match "architect|analyze|improve|fix|implement"
 
 $summonArgs = @{
     Task = $Task
-    Team = $teamList
+    Agents = 0
     MaxRounds = $maxRounds
+}
+if ($useAutoTeamFallback) {
+    $summonArgs['AutoTeam'] = $true
+} else {
+    $summonArgs['Team'] = $teamList
 }
 
 if ($Online) { $summonArgs['Online'] = $true }
 if ($AutoApplyPatches) { $summonArgs['AutoApplyPatches'] = $true }
+if ($VerifyAfterPatches) { $summonArgs['VerifyAfterPatches'] = $true }
 
 Write-Host "[Smart] Summoning Council..." -ForegroundColor Cyan
 # Capture the output to extract RunDir if possible, or just rely on latest run directory detection

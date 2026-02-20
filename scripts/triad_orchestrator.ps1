@@ -35,8 +35,10 @@ param(
 
   # Hybrid tuning (when -Online is set):
   # - CloudSeats: limit which agent IDs may use cloud (first N agents) to spend tokens on the highest-value seats.
+  # - CodexSeats: limit which agent IDs may use Codex CLI (first N agents) for high-tier reasoning.
   # - MaxLocalConcurrency: cap concurrent local Ollama calls to prevent "quota cliff" overload when falling back to local.
   [int]$CloudSeats = 3,
+  [int]$CodexSeats = 0,
   [int]$MaxLocalConcurrency = 2,
 
   [switch]$EnableCouncilBus,
@@ -973,7 +975,12 @@ function Generate-RunScaffold {
       "Security",
       "Ops",
       "Docs",
-      "Release"
+      "Release",
+      "CodexReviewer",
+      "Operator",
+      "Auditor",
+      "MultimediaDirector",
+      "RedTeam"
     )
     for ($i = 1; $i -le $Agents; $i++) {
       if ($i -le $defaultRoles.Count) {
@@ -1057,6 +1064,17 @@ function Generate-RunScaffold {
       $taskPipeline = "[TASK PIPELINE - ROUND PLAN]`r`n$taskPipeline`r`n`r`n"
     }
 
+    # --- MEM1: Internal State Consolidation ---
+    $internalState = ""
+    $mem1Path = Join-Path $RunDir "state\\mem1_consolidated_state.md"
+    if (Test-Path -LiteralPath $mem1Path) {
+        $stateContent = Read-Text $mem1Path
+        $internalState = "<INTERNAL_STATE>`r`n$stateContent`r`n</INTERNAL_STATE>`r`n`r`n"
+    } else {
+        $internalState = "<INTERNAL_STATE>`r`nMission Initialized. No previous actions to summarize.`r`n</INTERNAL_STATE>`r`n`r`n"
+    }
+    # --- End MEM1 ---
+
     $cap = ""
     if ($InjectCapabilityContract) {
       $cap = @"
@@ -1133,9 +1151,9 @@ $pt
 
     $roundTask = $task
     if ($CouncilPattern -eq "debate" -and $RoundNumber -eq 1) {
-      $roundTask = "RESEARCH: $task. Extract must-haves with citations from RESEARCH SOURCES. Do not invent repo file paths; only cite paths from REPO FILE INDEX."
+      $roundTask = "PARALLEL HYPOTHESIS GENERATION: $task. Each agent must propose a UNIQUE and DISTINCT hypothesis or architectural path. Do not agree with other agents yet. Focus on exploring the boundaries of the problem. Extract must-haves with citations from RESEARCH SOURCES. Cite paths from REPO FILE INDEX."
     } elseif ($CouncilPattern -eq "debate" -and $RoundNumber -eq 2) {
-      $roundTask = "DESIGN: $task. Map must-haves to minimal repo changes. Output a valid DECISION_JSON with files you intend to touch and verification commands. Avoid diffs in this round."
+      $roundTask = "JUDGE & CONVERGE: $task. Review the parallel hypotheses from Round 1. Act as a judge to identify the strongest path. Backtrack on flawed assumptions. Map the selected must-haves to minimal repo changes. Output a valid DECISION_JSON. Avoid diffs."
     } elseif ($CouncilPattern -eq "debate" -and $RoundNumber -ge 3) {
       $roundTask = "IMPLEMENT: $task. Produce git-applyable unified diffs for the planned changes, restricted to allowed paths. Prefer `diff --git a/... b/...` format (like `git diff`). Do not put prose inside ```diff blocks. Ensure DECISION_JSON.files lists every file touched by your diffs. Include verification commands."
     }
@@ -1156,12 +1174,19 @@ $pt
 
     $roleGuidance = ""
           switch ($role) {
+            "Architect" { $roleGuidance = "Focus: Process Reimagination. Do not just mirror manual steps; re-architect the workflow to be end-to-end autonomous. Use Python tools to skip intermediate manual UI steps." }
             "ResearchLead" { $roleGuidance = "Focus: Use web_search and fetch to find 'Gold Standard' implementations of identified patterns. Extract must-haves with citations from sources.md. No fake file paths." }
             "Engineer" { $roleGuidance = "Focus: implement minimal diffs under scripts/docs/configs/mcp. Output diffs that `git apply` will accept (prefer diff --git a/... b/... headers; complete hunks with @@ lines; no prose inside diff fences)." }
     
       "Tester" { $roleGuidance = "Focus: verification commands and failure modes. Challenge invalid assumptions." }
       "Critic" { $roleGuidance = "Focus: attack hallucinations (invalid file refs, fake citations) and simplify scope." }
-      "Security" { $roleGuidance = "Focus: tool safety, allowlists, and preventing prompt injection/exfiltration." }
+      "Security" { $roleGuidance = "Focus: tool safety, allowlists, and preventing prompt injection/exfiltration. Owns Iolaus (Loop Cauterization) and formal verification of all kinetic patches." }
+      "CodexReviewer" { $roleGuidance = "Focus: high-tier code review, architectural integrity, and identifying subtle logic flaws or edge cases using deep reasoning." }
+      "Operator" { $roleGuidance = "Focus: Large Action Model (LAM) patterns. Executes commerce (Redbubble), finance, and infrastructure actions autonomously. Owns A2A bridges." }
+      "Auditor" { $roleGuidance = "Focus: Swarm Governance. Monitor agent actions, verify compliance with safety rules, and log all decisions for auditability. Owns Wampum Signing and Signet verification." }
+      "MultimediaDirector" { $roleGuidance = "Focus: AI-Omnimodal Experiences. Orchestrate workflows across text, code, and multimedia. Assemble unified reports from multiple data sources." }
+      "RedTeam" { $roleGuidance = "Focus: Adversarial Simulation. Actively try to break the plan. Propose edge cases, injection attacks, or logic gaps that others missed. Assume the system is compromised." }
+      "Manager" { $roleGuidance = "Focus: Goal Alignment & Resource Optimization. Owns Zhinan (Alignment) and Mana (Prioritization). Ensures the swarm remains on mission." }
       default { $roleGuidance = "Focus: repo-grounded improvements; prefer minimal, testable changes." }
     }
 
@@ -1173,7 +1198,7 @@ $pt
     } catch { $targetFiles = "" }
 
     $body = @"
- $facts$repoIndex$targetFiles$retrieval$world$sources$skills$darkMatter$taskContract$taskPipeline$anchor$lessons$header
+ $facts$repoIndex$targetFiles$internalState$retrieval$world$sources$skills$darkMatter$taskContract$taskPipeline$anchor$lessons$header
  $cap$supervisorMemo$ownerBlock$onto$misinfo$adv$poison
  [OPERATIONAL CONTEXT]
   REPO_ROOT: $RepoRoot
@@ -1191,6 +1216,7 @@ $roundTask
  [OUTPUT CONTRACT]
  - Cite exact repo file paths (only from REPO FILE INDEX unless you are creating a new file via a diff).
  - Include at least one verification command (Round 3+ must be runnable).
+ - MEM1: At the end of your output, provide a concise 1-3 sentence update for the <INTERNAL_STATE> based on your actions this round. Use the tag: [MEM1_UPDATE].
  - If you need additional procedural playbooks from the local skill libraries, request them for the next round by adding:
    ```json SKILL_REQUEST_JSON
    {"skills":["playwright","security-best-practices"],"reason":"why you need them"}
@@ -1537,6 +1563,29 @@ function Compute-EffectiveMaxParallel {
   return [Math]::Min($req, $cap)
 }
 
+function Wait-For-User-Approval([string]$Action) {
+  Write-Host ""
+  Write-Host " [HITL] WAITING FOR HUMAN APPROVAL: $Action" -ForegroundColor Yellow
+  Write-Host " Press 'Y' to Approve, 'N' to Abort, or 'S' to Skip this specific action."
+  $key = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+  
+  $rlhf = Join-Path $RepoRoot "scripts\\rlhf_logger.py"
+  
+  if ($key.Character -eq 'y' -or $key.Character -eq 'Y') {
+    Write-Host " -> APPROVED." -ForegroundColor Green
+    if (Test-Path $rlhf) { & python $rlhf $RunDir "approval" 1.0 "hitl_gate" | Out-Null }
+    return $true
+  } elseif ($key.Character -eq 'n' -or $key.Character -eq 'N') {
+    Write-Host " -> ABORTED BY USER." -ForegroundColor Red
+    if (Test-Path $rlhf) { & python $rlhf $RunDir "rejection" -1.0 "hitl_gate" | Out-Null }
+    throw "User aborted execution during HITL gate."
+  } else {
+    Write-Host " -> SKIPPED." -ForegroundColor Gray
+    if (Test-Path $rlhf) { & python $rlhf $RunDir "skip" 0.0 "hitl_gate" | Out-Null }
+    return $false
+  }
+}
+
 function Invoke-NativeStrict {
   param(
     [Parameter(Mandatory=$true)][string]$Exe,
@@ -1828,6 +1877,13 @@ if ($existingRunnerScripts -and $existingRunnerScripts.Count -gt 0) {
     $env:GEMINI_OP_CLOUD_AGENT_IDS = ""
   }
 
+  if ($Online -and ([int]$CodexSeats -gt 0)) {
+    $ids = 1..([int]$CodexSeats)
+    $env:GEMINI_OP_CODEX_AGENT_IDS = (@($ids) -join ",")
+  } else {
+    $env:GEMINI_OP_CODEX_AGENT_IDS = ""
+  }
+
   # Machine-checkable run manifest (plan + budgets). Best-effort.
   try {
     $mr = Join-Path $RepoRoot "scripts\\manifest_router.py"
@@ -1842,7 +1898,7 @@ if ($existingRunnerScripts -and $existingRunnerScripts.Count -gt 0) {
         "--max-rounds","$MaxRounds"
       )
       if ($Online) { $margs += "--online" }
-      $margs += @("--cloud-seats","$CloudSeats","--max-local-concurrency","$MaxLocalConcurrency")
+      $margs += @("--cloud-seats","$CloudSeats","--codex-seats","$CodexSeats","--max-local-concurrency","$MaxLocalConcurrency")
       if ($QuotaCloudCalls -gt 0) { $margs += @("--quota-cloud-calls","$QuotaCloudCalls") }
       if ($QuotaCloudCallsPerAgent -gt 0) { $margs += @("--quota-cloud-calls-per-agent","$QuotaCloudCallsPerAgent") }
       if ($RequireDecisionJson) { $margs += "--require-decision-json" }
@@ -1894,6 +1950,13 @@ if ($existingRunnerScripts -and $existingRunnerScripts.Count -gt 0) {
     $env:GEMINI_OP_CLOUD_AGENT_IDS = ""
   }
 
+  if ($Online -and ([int]$CodexSeats -gt 0)) {
+    $ids = 1..([int]$CodexSeats)
+    $env:GEMINI_OP_CODEX_AGENT_IDS = (@($ids) -join ",")
+  } else {
+    $env:GEMINI_OP_CODEX_AGENT_IDS = ""
+  }
+
   # Machine-checkable run manifest (plan + budgets). Best-effort.
   try {
     $mr = Join-Path $RepoRoot "scripts\\manifest_router.py"
@@ -1908,7 +1971,7 @@ if ($existingRunnerScripts -and $existingRunnerScripts.Count -gt 0) {
         "--max-rounds","$MaxRounds"
       )
       if ($Online) { $margs += "--online" }
-      $margs += @("--cloud-seats","$CloudSeats","--max-local-concurrency","$MaxLocalConcurrency")
+      $margs += @("--cloud-seats","$CloudSeats","--codex-seats","$CodexSeats","--max-local-concurrency","$MaxLocalConcurrency")
       if ($QuotaCloudCalls -gt 0) { $margs += @("--quota-cloud-calls","$QuotaCloudCalls") }
       if ($QuotaCloudCallsPerAgent -gt 0) { $margs += @("--quota-cloud-calls-per-agent","$QuotaCloudCallsPerAgent") }
       if ($RequireDecisionJson) { $margs += "--require-decision-json" }
@@ -2243,6 +2306,26 @@ if ($existingRunnerScripts -and $existingRunnerScripts.Count -gt 0) {
     Write-Log "round $r complete"
     Write-OrchLog -RunDir $RunDir -Msg "round_complete round=$r"
     try { Append-LifecycleEvent -RunDir $RunDir -Event "round_complete" -RoundNumber $r -AgentId 0 -Details @{} } catch { }
+    $rc = $LASTEXITCODE
+    if ($rc -eq 0) {
+      try {
+        $scorer = Join-Path $RepoRoot "scripts\\agent_self_learning.py"
+        if (Test-Path -LiteralPath $scorer) {
+          $jsonText = & python $scorer score-round --run-dir $RunDir --round $r
+          if ($LASTEXITCODE -eq 0 -and $jsonText) {
+            $scoreObj = $jsonText | ConvertFrom-Json
+            if ($scoreObj -and $scoreObj.average_score -lt $Threshold) {
+              Write-Log ("[BACKTRACK] Round $r failed validation (Score: $($scoreObj.average_score)). Retrying with critique.")
+              Write-OrchLog -RunDir $RunDir -Msg ("backtrack round={0} score={1}" -f $r, $scoreObj.average_score)
+              # Injection of critique into prompt for the retry is handled by supervisor_round1.json logic in next iteration
+              if ($r -gt 1) { $r-- } # Backtrack one round
+              continue
+            }
+          }
+        }
+      } catch { }
+    }
+    
     try { Update-RunLedgerRoundEvent -RunDir $RunDir -RoundNumber $r -Event "complete" } catch { }
 
     # --- Thermodynamics: Boltzmann Entropy (Maxwell's Demon) ---
@@ -2455,6 +2538,16 @@ if ($existingRunnerScripts -and $existingRunnerScripts.Count -gt 0) {
       Write-OrchLog -RunDir $RunDir -Msg ("world_state_rebuild_failed round={0} error={1}" -f $r, $_.Exception.Message)
     }
 
+    # --- NEW: MEM1 State Consolidation ---
+    try {
+      $m1 = Join-Path $RepoRoot "scripts\\mem1_consolidator.py"
+      if (Test-Path -LiteralPath $m1) {
+        Write-Log "[MEM1] Consolidating internal state for round $r..."
+        & python $m1 $RunDir $r | Out-Null
+      }
+    } catch { }
+    # --- End MEM1 ---
+
     # If a global cloud quota is configured and exhausted, disable further cloud attempts for later rounds.
     if ($Online -and ($QuotaCloudCalls -gt 0) -and -not [string]::IsNullOrWhiteSpace($env:GEMINI_OP_ALLOW_CLOUD)) {
       try {
@@ -2500,8 +2593,33 @@ if ($existingRunnerScripts -and $existingRunnerScripts.Count -gt 0) {
         if ($rankedForApply -gt 0) {
           $cpaArgs += @("--agent","$rankedForApply")
           Write-OrchLog -RunDir $RunDir -Msg ("auto_apply_ranked_agent round={0} agent={1}" -f $r, $rankedForApply)
+          
+          # --- MILITARY GRADE: FORMAL VERIFICATION GATE ---
+          # Run symbolic logic check on the patch BEFORE allowing application.
+          try {
+             $patchFile = Join-Path $RunDir ("state\\decisions\\round{0}_agent{1}.json" -f $r, $rankedForApply) # Logic handles extraction
+             # (Note: In a full impl we'd verify the diff file directly; here we assume the decision JSON leads to it. 
+             # Ideally we check the generated diff. For now, we trust the extract step has made the diff available.)
+             # Actually, let's verify the agent output MD which contains the diff block.
+             $agentMd = Join-Path $RunDir ("round{0}_agent{1}.md" -f $r, $rankedForApply)
+             $fv = Join-Path $RepoRoot "scripts\\formal_verifier.py"
+             if (Test-Path $fv) {
+                 Write-Log "[FORMAL VERIFICATION] Running Neuro-Symbolic Safety Check..."
+                 $verifyOut = Invoke-NativeStrict -Exe "python" -Args @($fv, $agentMd) -Context "formal_verification"
+                 Write-Log $verifyOut
+             }
+          } catch {
+             Write-Log "[BLOCK] Formal Verification Failed: $($_.Exception.Message)"
+             Write-OrchLog -RunDir $RunDir -Msg "formal_verification_failed"
+             continue # Skip apply this round
+          }
+          # --- End Formal Verification ---
         }
-        if ($RequireApproval) { $cpaArgs += "--require-approval" }
+        if ($RequireApproval) { 
+          $cpaArgs += "--require-approval" 
+          $ok = Wait-For-User-Approval -Action "Apply code patches from Agent $rankedForApply (Round $r)"
+          if (-not $ok) { return }
+        }
         if ($RequireGrounding) { $cpaArgs += "--require-grounding" }
         try { Append-LifecycleEvent -RunDir $RunDir -Event "auto_apply_patches_start" -RoundNumber $r -AgentId 0 -Details @{ require_approval = [bool]$RequireApproval; require_grounding = [bool]$RequireGrounding } } catch { }
         Invoke-NativeStrict -Exe "python" -Args $cpaArgs -Context ("council_patch_apply round={0}" -f $r) | Out-Null
@@ -2904,6 +3022,15 @@ if ($FailClosedOnThreshold -and ($finalAvg -lt $Threshold)) {
   Emit-HawkingRadiation -RepoRoot $RepoRoot -RunDir $RunDir -Reason "fail_threshold" -RoundNumber 0 -AgentId 0 -ErrorMsg ("final_avg={0} threshold={1}" -f $finalAvg, $Threshold)
   exit 1
 }
+
+# --- NEW: Omnimodal Mediator (AI Ecosystem Integration) ---
+try {
+  $om = Join-Path $RepoRoot "scripts\\omnimodal_mediator.py"
+  if (Test-Path -LiteralPath $om) {
+    Write-Log "[Omnimodal] Generating unified mission report..."
+    & python $om $RunDir | Out-Null
+  }
+} catch { }
 
 Write-Log "OK"
   Write-OrchLog -RunDir $RunDir -Msg "exit ok"
