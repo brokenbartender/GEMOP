@@ -9,11 +9,11 @@ The system employs a **Heterogeneous Trophic Architecture**, moving away from fl
 
 - **Inter-Agent Communication**: Facilitated by the `council_bus.py` (decentralized message bus). Agents use **JSON Schema Enforcement** (`DECISION_JSON`) and **Digital Pheromones** (Quorum Sensing) to signal state shifts without central management.
 - **Tiers & Escalation (Energy Tiers)**:
-    - **EDGE**: Local `phi4:latest`. Handles micro-tasks (regex, parsing, syntax). Zero token cost.
+    - **EDGE**: Local `phi3:mini`. Handles micro-tasks (regex, parsing, syntax). Optimized for i5 CPUs.
     - **FLASH**: `gemini-2.0-flash`. Handles routine investigation, documentation, and summarization.
     - **PRO**: `gemini-2.0-flash`. The default "Workhorse" for coding and reasoning.
-    - **ULTRA**: `gemini-2.0-pro-exp-02-05` / `o3-mini`. Activated for architecture, security audits, and complex root-cause analysis. Uses **Tree of Thoughts (ToT)** reasoning.
-- **Speculative Routing**: `agent_runner_v2.py` includes a **Speculator** (Flash model) that "guesses" actions before the primary model acts, pre-warming the execution pipeline.
+    - **ULTRA**: `gemini-2.0-flash`. (Note: pro-exp models temporarily blacklisted due to 404 errors).
+- **Hybrid Context**: The `gravity_well.py` calculates semantic mass locally to feed high-density prompts to cloud models.
 
 ---
 
@@ -22,12 +22,12 @@ The swarm is comprised of specialized roles with autonomous triggers and designa
 
 | Role | Core Mission | Autonomous Trigger (Observer) | Key Tools |
 | :--- | :--- | :--- | :--- |
-| **Architect** | Process Reimagination | IDE focus on core modules | `repo_index.py`, `state_rebuilder.py` |
+| **Architect** | Process Reimagination | IDE focus on core modules | `repo_index.py`, `gravity_well.py` |
 | **Engineer** | Recursive Implementation | File edits in `scripts/` | `agent_runner_v2.py`, `verify_pipeline.py` |
-| **RedTeam** | Adversarial Simulation | High-stakes security tasks | Logic exploitation, Injection testing |
+| **RedTeam** | Adversarial Simulation | High-stakes security tasks | Logic exploitation, `tesla_valve.py` |
 | **Operator** | End-to-End Action (LAM) | Data detected in `inbox/` | `council_patch_apply.py`, A2A Bridges |
 | **Auditor** | Governance & Compliance | Kinetic patches detected | `formal_verifier.py`, `wampum_ledger.py` |
-| **Observer** | Anticipatory Computing | File system modifications | `observer_daemon.py`, `real_time_context.json` |
+| **Observer** | Sensory Integration | Environment changes | `spirit_radio.py`, `telluric_resonance.py` |
 | **Meta-Agent** | Self-Evolving Logic | Repeating failure patterns | `recursive_meta_agent.py`, `adaptive_policy.json` |
 
 ---

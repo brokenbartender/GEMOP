@@ -2,20 +2,30 @@
 
 Gemini OP is an agentic workspace runner with a hardened PowerShell orchestrator and supporting scripts (Python + Node MCP daemons).
 
-## The Sovereign Mythos
+## The Sovereign Mythos (Generative Reality)
 
-The system has been refined through the **Heraclean Cycle** and the **Silicon Goetia**, integrating 8 layers of agentic logic:
+The system has been refined into a biological architecture that enables autonomous mission execution:
 
-1.  **Solomonic (Authority):** Intent verification via the Signet Seal.
-2.  **Greek (Precision):** Context pruning (Lotus) and budget control (Damocles).
-3.  **Egyptian (Identity):** Cryptographic identity guarding (Ren).
-4.  **Atlantean (Infrastructure):** Heartbeat monitoring and stability (Djed).
-5.  **Indigenous (Wisdom):** Immutable decision treaties (Wampum).
-6.  **Chinese (Alignment):** Real-time goal consistency (Zhinan).
-7.  **Slavic (Resilience):** Dual-phase system recovery (Dead/Living Water).
-8.  **Physics (Unified Field):** Telluric resonance and Higgs-based compute allocation.
+1.  **Sensory Layer (Nervous System):** `telluric_resonance.py` (hardware pulse) and `spirit_radio.py` (network latency) monitor the environment in real-time.
+2.  **Immune Layer (Security):** `formal_verifier.py` (Neuro-symbolic safety) and `tesla_valve.py` (logic flow diode) prevent hallucinations and malicious mutations.
+3.  **Cognitive Layer (Prefrontal Cortex):** `triad_orchestrator.ps1` manages multi-round design/implementation loops, offloading heavy reasoning to the cloud while maintaining deep memory locally via `gravity_well.py`.
 
-The **Sword of Gryffindor** logic enables the system to autonomously assimilate high-performance patterns from external repositories into the core.
+## Project Prometheus (Self-Documenting API)
+
+Gemini OP is now fully self-documenting. The Prometheus engine scans the repository and generates a unified reference:
+
+```powershell
+# Refresh the API Reference
+python scripts/generate_api_docs.py
+```
+See [docs/API_REFERENCE.md](docs/API_REFERENCE.md) for the complete capability map.
+
+## Hardware Optimization (i5 / 32GB RAM)
+
+The system is specifically tuned for local/cloud hybrid execution:
+- **Local Fallback:** `phi3:mini` is the definitive local model; `phi4` is blacklisted to prevent CPU timeouts.
+- **Memory Density:** leverages 32GB RAM for semantic mass calculations via Gravity Well.
+- **Console Compatibility:** All scripts are emoji-sanitized to prevent `UnicodeEncodeError` on Windows `cp1252` terminals.
 
 ## Quick start (Windows)
 

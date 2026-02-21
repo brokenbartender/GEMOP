@@ -116,6 +116,20 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/phase_24_retry_loop.
 # End-to-end pack (retry + world model + roadmap verify)
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts/phase_22_27_orchestrate.ps1 -RunDir .agent-jobs/<run-id> -Threshold 70 -MaxReruns 2
 
-# Verify roadmap gates
-python scripts/gemini_verify.py --check roadmap --strict
+## 13) Project Prometheus (God Mode & Self-Docs)
+
+Summon the full autonomous swarm with all power modules active:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/omni_god_mode.ps1 -Task "Your complex objective" -Rounds 3 -Autonomous
+```
+
+Refresh the unified API reference:
+
+```powershell
+python scripts/generate_api_docs.py
+```
+Check status:
+```powershell
+ls docs/API_REFERENCE.md
 ```
