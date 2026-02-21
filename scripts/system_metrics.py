@@ -65,6 +65,29 @@ def env_min_free_mem_mb(default: int = 1200) -> int:
         return int(default)
 
 
+import mmap
+import json
+from pathlib import Path
+
+def get_ground_state(run_dir: Path) -> dict:
+    """Reads the high-frequency Telluric Resonance from memory map."""
+    wave_path = run_dir / "state" / "telluric_wave.bin"
+    if not wave_path.exists(): return {}
+    try:
+        with open(wave_path, "r+b") as f:
+            with mmap.mmap(f.fileno(), 1024*1024, access=mmap.ACCESS_READ) as mm:
+                data = mm.read(1024*1024).rstrip(b"\0")
+                return json.loads(data) if data else {}
+    except: return {}
+
+def get_network_static(run_dir: Path) -> dict:
+    """Reads the Spirit Radio broadcast from disk."""
+    radio_path = run_dir / "state" / "spirit_radio_broadcast.json"
+    if not radio_path.exists(): return {}
+    try:
+        return json.loads(radio_path.read_text(encoding="utf-8"))
+    except: return {}
+
 def low_memory() -> tuple[bool, dict[str, Any]]:
     mi = memory_info()
     min_free = env_min_free_mem_mb()

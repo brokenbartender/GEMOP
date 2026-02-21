@@ -22,6 +22,17 @@ def get_ren_hash(prompt_path: Path) -> str:
     content = prompt_path.read_text(encoding='utf-8', errors='ignore')
     return hashlib.sha256(content.encode('utf-8')).hexdigest()
 
+def generate_bdi(role: str, mission_objective: str) -> str:
+    """Generates an immutable BDI anchor block."""
+    return f"""
+[BDI ANCHOR: THE REN]
+IDENTITY: You are {role}.
+BELIEF: Your environment is the current repository state and the mission anchor.
+DESIRE: Fulfill the objective: {mission_objective}.
+INTENTION: Execute the next logical step toward the goal without mission drift.
+[END ANCHOR]
+"""
+
 def verify_integrity(agent_output: str, original_ren_hash: str) -> bool:
     """Verifies that the agent hasn't been hijacked or compromised."""
     for pattern in JAILBREAK_PATTERNS:

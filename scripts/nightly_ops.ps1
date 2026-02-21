@@ -19,6 +19,7 @@ Remove-Item (Join-Path $RepoRoot "ramshare\state\queue\leases.json") -ErrorActio
 Write-Host "[4/5] Running deep Mycelium consolidation..."
 # Use all-miniLM local models to re-index and prune
 & python scripts\memory_ingest.py --all *>> $log
+& python scripts\wormhole_indexer.py *>> $log
 
 # 5. Full System Audit
 Write-Host "[5/5] Generating full performance/ROI report..."

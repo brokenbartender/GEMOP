@@ -8,7 +8,7 @@ def aggregate_run(run_dir_path):
     state_dir = run_dir / "state"
     report_path = run_dir / "OMNIMODAL_REPORT.md"
     
-    print(f"--- 🌐 OMNIMODAL MEDIATOR: Aggregating {run_dir.name} ---")
+    print(f"--- OMNIMODAL MEDIATOR: Aggregating {run_dir.name} ---")
     
     report = []
     report.append(f"# 🚀 Omnimodal Mission Report")
@@ -65,7 +65,7 @@ def aggregate_run(run_dir_path):
         report.append(f"- **Tokens Saved (Cache Hits):** {cache_hits}")
 
     report_path.write_text("\n".join(report), encoding="utf-8")
-    print(f"✅ Omnimodal Report Generated: {report_path}")
+    print(f"Omnimodal Report Generated: {report_path}")
 
 if __name__ == "__main__":
     import sys

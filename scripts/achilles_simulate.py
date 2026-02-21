@@ -1,8 +1,22 @@
 import argparse
 import os
 import shutil
+import ast
 import subprocess
 from pathlib import Path
+
+def verify_tool_code(code: str) -> tuple[bool, str]:
+    """Scans Python code for destructive patterns using AST."""
+    try:
+        tree = ast.parse(code)
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
+                if hasattr(node.func.value, 'id') and node.func.value.id in ['os', 'subprocess', 'shutil']:
+                    if node.func.attr in ['system', 'popen', 'rmtree', 'remove']:
+                        return False, f"Dangerous syscall detected: {node.func.value.id}.{node.func.attr}"
+        return True, "Code passed static analysis."
+    except SyntaxError as e:
+        return False, f"Syntax Error: {e}"
 
 def simulate_patch(repo_root: Path, patch_path: Path):
     """

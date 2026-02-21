@@ -11,23 +11,38 @@ param(
 
 $RepoRoot = Get-Location
 $RunDir = Join-Path $RepoRoot ".agent-jobs\god_run_$(Get-Date -Format 'yyyyMMdd_HHmmss')"
-New-Item -ItemType Directory -Path $RunDir -Force | Out-Null
+# New-Item -ItemType Directory -Path $RunDir -Force | Out-Null -> Handled by summon.ps1
+
+# --- HARDWARE COMPATIBILITY: i5/32GB ---
+$env:GEMINI_OP_OLLAMA_MODEL_DEFAULT = "phi3:mini"
+$env:GEMINI_OP_MODEL_EDGE_LOCAL = "phi3:mini"
 
 Write-Host "`n" + ("="*60) -ForegroundColor Cyan
 Write-Host "      ⚡ GEMINI OP: GOD MODE ACTIVATED ⚡" -ForegroundColor Cyan
 Write-Host ("="*60) -ForegroundColor Cyan
+
+# 0. Clean Slate (Manual Killswitch)
+Write-Host "[0/4] Clearing previous sessions..." -ForegroundColor Yellow
+$StopScript = Join-Path $RepoRoot "scripts\stop_agents.ps1"
+if (Test-Path $StopScript) {
+    & pwsh -NoProfile -ExecutionPolicy Bypass -File $StopScript -ClearStopFlags
+}
 
 # 1. Start Background Power Daemons
 Write-Host "[1/4] Igniting Super-Power Daemons..." -ForegroundColor Yellow
 $Daemons = @(
     "scripts/observer_daemon.py",
     "scripts/recursive_meta_agent.py",
-    "scripts/ai_data_factory.py"
+    "scripts/ai_data_factory.py",
+    "scripts/telluric_resonance.py",
+    "scripts/spirit_radio.py",
+    "scripts/tarot_telemetry.py"
 )
 
 $ProcessIds = @()
 foreach ($d in $Daemons) {
-    $p = Start-Process python -ArgumentList (Join-Path $RepoRoot $d) -WindowStyle Minimized -PassThru
+    $ScriptPath = Join-Path $RepoRoot $d
+    $p = Start-Process python -ArgumentList "`"$ScriptPath`" --run-dir `"$RunDir`"" -WindowStyle Minimized -PassThru
     $ProcessIds += $p.Id
     Write-Host "  -> $(Split-Path $d -Leaf) active (PID: $($p.Id))"
 }
@@ -41,13 +56,17 @@ Write-Host "[3/4] Summoning the High-Intelligence Swarm..." -ForegroundColor Yel
 $SummonArgs = @("-Task", $Task, "-Team", $Team, "-MaxRounds", $Rounds, "-RunDir", $RunDir)
 if ($Online) { $SummonArgs += "-Online" }
 $SummonArgs += "-AutoApplyPatches"
+$SummonArgs += "-CloudSeats", "5" # Full swarm cloud access
+$SummonArgs += @("-AgentTimeoutSec", "1200") # 20 min timeout
+
 if (-not $Autonomous) {
     $SummonArgs += "-RequireApproval" # Security Gating
 } else {
     Write-Host "  -> AUTONOMOUS MODE: Approval Gating DISABLED." -ForegroundColor Red
 }
 
-pwsh .\scripts\summon.ps1 @SummonArgs
+Write-Host "[Summon] Invoking Orchestrator in $RunDir..." -ForegroundColor Cyan
+& pwsh -NoProfile -ExecutionPolicy Bypass -File ".\scripts\summon.ps1" @SummonArgs
 
 # 4. Final Aggregation & Cleanup
 Write-Host "[4/4] Generating Omnimodal Mission Report..." -ForegroundColor Yellow
@@ -60,6 +79,6 @@ Write-Host ("="*60) -ForegroundColor Cyan
 
 # Cleanup Daemons
 Write-Host "Shutting down Super-Power Daemons..." -ForegroundColor Gray
-foreach ($pid in $ProcessIds) {
-    Stop-Process -Id $pid -Force -ErrorAction SilentlyContinue
+foreach ($DaemonPid in $ProcessIds) {
+    Stop-Process -Id $DaemonPid -Force -ErrorAction SilentlyContinue
 }

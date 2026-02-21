@@ -2,7 +2,10 @@ import os
 import time
 import json
 from pathlib import Path
-from scripts.memory_manager import MemoryManager
+try:
+    from scripts.memory_manager import MemoryManager
+except ImportError:
+    from memory_manager import MemoryManager
 
 def run_data_factory():
     print("--- 🏭 AI DATA FACTORY: Engaged ---")

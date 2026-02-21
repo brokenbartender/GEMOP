@@ -1032,7 +1032,7 @@ def ensure_ollama_model(model_name):
 def call_ollama(prompt, model_name, options=None, timeout_s=None):
     """Calls local Ollama instance (Reliable Fallback)."""
     if timeout_s is None:
-        timeout_s = _read_int_env("GEMINI_OP_OLLAMA_TIMEOUT_S", 300)
+        timeout_s = _read_int_env("GEMINI_OP_OLLAMA_TIMEOUT_S", 900)
     log(f"ROUTING TO LOCAL OLLAMA: {model_name}")
     ensure_ollama_model(model_name)
      
@@ -1308,6 +1308,9 @@ def run_agent(prompt_path, out_md, fallback_model=None):
         role_lower = role_name.lower()
         tier = determine_tier(prompt, role_name)
         
+        # Initialize local_model early so it's available for tier mapping
+        local_model = select_local_model_for_agent(prompt, fallback_model, agent_id)
+        
         # Apply service-router override (fail-closed: local overrides are always honored; cloud overrides only when allowed).
         if service_router_tier == "local":
             tier = "local"
@@ -1496,7 +1499,7 @@ Output your reasoning in a > block before your main response.
         # Model mapping per tier
         tier_models = {
             "ultra": {
-                "gemini": (os.environ.get("GEMINI_OP_MODEL_ULTRA_GEMINI") or "gemini-2.0-pro-exp-02-05").strip(),
+                "gemini": (os.environ.get("GEMINI_OP_MODEL_ULTRA_GEMINI") or "gemini-2.0-flash").strip(),
                 "codex": (os.environ.get("GEMINI_OP_MODEL_ULTRA_CODEX") or "o3-mini").strip(),
                 "opus": (os.environ.get("GEMINI_OP_MODEL_ULTRA_OPUS") or "claude-4.6-opus").strip(),
                 "gpt5": (os.environ.get("GEMINI_OP_MODEL_ULTRA_GPT") or "gpt-5.3-preview").strip()
@@ -1517,6 +1520,8 @@ Output your reasoning in a > block before your main response.
         }
         
         # Resolve target models for this specific run
+        local_model = select_local_model_for_agent(prompt, fallback_model, agent_id)
+
         target_gemini_model = "gemini-2.0-flash" # fallback
         target_codex_model = "o3-mini" # fallback
         target_local_model = local_model
@@ -1533,8 +1538,6 @@ Output your reasoning in a > block before your main response.
 
         enable_codex_provider = (os.environ.get("GEMINI_OP_ENABLE_CODEX_PROVIDER") or "1").strip().lower() in ("1", "true", "yes")
         prefer_codex_provider = (os.environ.get("GEMINI_OP_PREFER_CODEX_PROVIDER") or "1").strip().lower() in ("1", "true", "yes")
-
-        local_model = select_local_model_for_agent(prompt, fallback_model, agent_id)
 
         def local_call() -> str:
             nonlocal slot_wait_s, selected_backend, selected_model

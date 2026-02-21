@@ -2,6 +2,9 @@ import os
 import re
 import json
 import pathlib
+import datetime
+import sys
+import subprocess
 
 def log_message(run_dir, message):
     log_path = run_dir / "broker.log"
@@ -29,8 +32,23 @@ def find_capability_requests(text):
                 log_message(f"Could not parse tool request: {line} | Error: {e}")
     return requests
 
+try:
+    from scripts.achilles_simulate import verify_tool_code
+except ImportError:
+    from achilles_simulate import verify_tool_code
+
 def forge_tool(run_dir, request):
-    """Creates a new tool script in the tools directory."""
+    """Creates a new tool script in the tools directory after Achilles vetting."""
+    tool_name = request['name']
+    tool_code = request['code']
+    
+    # --- ACHILLES SANDBOX ---
+    ok, msg = verify_tool_code(tool_code)
+    if not ok:
+        log_message(run_dir, f"[BLOCK] Achilles found a weakness in '{tool_name}': {msg}")
+        return
+    # --- End Achilles ---
+
     tools_dir = pathlib.Path(run_dir).parent.parent / "tools"
     tools_dir.mkdir(exist_ok=True)
     
@@ -54,6 +72,7 @@ def forge_tool(run_dir, request):
 
 def run_broker(run_dir):
     """Main broker function to scan for and fulfill capability requests."""
+    print(f"DEBUG: Broker started with run_dir='{run_dir}'")
     run_path = pathlib.Path(run_dir)
     log_message(run_path, f"Capability Broker activated for {run_path.name}")
 
@@ -71,12 +90,25 @@ def run_broker(run_dir):
                 forge_tool(run_path, req)
             elif req['type'] == 'capability':
                 cap = req.get('name')
+                cmd = []
                 if cap == 'governance':
-                    subprocess.run([sys.executable, str(pathlib.Path(__file__).parent / "dark_matter_halo.py"), "--run-dir", str(run_dir), "--query", "implicit_governance_check"])
+                    cmd = [sys.executable, str(pathlib.Path(__file__).parent / "dark_matter_halo.py"), "--run-dir", str(run_dir), "--query", "implicit_governance_check"]
                 elif cap == 'mythology':
-                    subprocess.run([sys.executable, str(pathlib.Path(__file__).parent / "myth_runtime.py"), "--run-dir", str(run_dir), "--round", "1"])
+                    cmd = [sys.executable, str(pathlib.Path(__file__).parent / "myth_runtime.py"), "--run-dir", str(run_dir), "--round", "1"]
                 elif cap == 'entropy':
-                    subprocess.run([sys.executable, str(pathlib.Path(__file__).parent / "maxwells_demon.py"), "--run-dir", str(run_dir)])
+                    cmd = [sys.executable, str(pathlib.Path(__file__).parent / "maxwells_demon.py"), "--run-dir", str(run_dir)]
+                elif cap == 'gravity':
+                    cmd = [sys.executable, str(pathlib.Path(__file__).parent / "gravity_well.py"), "--run-dir", str(run_dir), "--query", "mission_critical_context"]
+                elif cap == 'wormhole':
+                    cmd = [sys.executable, str(pathlib.Path(__file__).parent / "wormhole_indexer.py")]
+                elif cap == 'quantum':
+                    cmd = [sys.executable, str(pathlib.Path(__file__).parent / "quantum_state.py"), "--run-dir", str(run_dir), "--task", "Analyze system entropy and propose recovery."]
+                elif cap == 'higgs':
+                    cmd = [sys.executable, str(pathlib.Path(__file__).parent / "higgs_field.py"), "--run-dir", str(run_dir)]
+                
+                if cmd:
+                    print(f"DEBUG: Invoking capability: {cmd}")
+                    subprocess.run(cmd)
 
 if __name__ == "__main__":
     import sys

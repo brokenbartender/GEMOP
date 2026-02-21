@@ -96,13 +96,15 @@ function Test-OllamaAvailable {
 
 # Stop other agents first (killswitch), then clear stop flags.
 # Important: do this before creating a new run dir, because stop_agents writes STOP into all known run dirs.
-try {
-  $StopScript = Join-Path $RepoRoot "scripts\\stop_agents.ps1"
-  if (Test-Path -LiteralPath $StopScript) {
-    & powershell -NoProfile -ExecutionPolicy Bypass -File $StopScript | Out-Null
-    & powershell -NoProfile -ExecutionPolicy Bypass -File $StopScript -ClearStopFlags | Out-Null
-  }
-} catch { }
+if ($StopOthers) {
+  try {
+    $StopScript = Join-Path $RepoRoot "scripts\\stop_agents.ps1"
+    if (Test-Path -LiteralPath $StopScript) {
+      & powershell -NoProfile -ExecutionPolicy Bypass -File $StopScript | Out-Null
+      & powershell -NoProfile -ExecutionPolicy Bypass -File $StopScript -ClearStopFlags | Out-Null
+    }
+  } catch { }
+}
 
 if ([string]::IsNullOrWhiteSpace($RunDir)) {
   $jobs = Join-Path $RepoRoot ".agent-jobs"

@@ -2,7 +2,10 @@ import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 
-from scripts.memory_manager import MemoryManager
+try:
+    from scripts.memory_manager import MemoryManager
+except ImportError:
+    from memory_manager import MemoryManager
 import numpy as np
 
 def test_memory():
