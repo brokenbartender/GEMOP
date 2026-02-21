@@ -1,0 +1,43 @@
+# 🌐 Gemini OP: Ecosystem State (Unified Configuration)
+# Generated autonomously during Ecosystem Assimilation Protocol.
+
+meta:
+  version: 2026.1
+  generated_at: "2026-02-20"
+  status: "active"
+
+core:
+  ask_for_approval: "on-request"
+  sandbox: "workspace-write"
+  model_default: "gpt-5.2-Gemini"
+  personality: "pragmatic"
+
+features:
+  powershell_utf8: true
+  unified_exec: true
+  shell_snapshot: true
+
+dark_matter:
+  enabled: true
+  base_weights:
+    safety: 0.35
+    efficiency: 0.20
+    goal_coherence: 0.25
+    verification: 0.20
+  policy:
+    prefer_repo_grounding: true
+    prefer_minimal_edits: true
+    require_verification_bias: true
+
+profiles:
+  active_profile: "full"
+  definitions:
+    full:
+      description: "Standard production profile with all daemons active."
+      daemons: ["observer", "meta_agent", "data_factory"]
+    research:
+      description: "Low-impact profile for deep research tasks."
+      daemons: ["data_factory"]
+    god_mode:
+      description: "Unrestricted autonomous operation."
+      daemons: ["observer", "meta_agent", "data_factory", "red_team"]

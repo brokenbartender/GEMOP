@@ -69,9 +69,18 @@ def run_broker(run_dir):
         for req in requests:
             if req['type'] == 'tool':
                 forge_tool(run_path, req)
+            elif req['type'] == 'capability':
+                cap = req.get('name')
+                if cap == 'governance':
+                    subprocess.run([sys.executable, str(pathlib.Path(__file__).parent / "dark_matter_halo.py"), "--run-dir", str(run_dir), "--query", "implicit_governance_check"])
+                elif cap == 'mythology':
+                    subprocess.run([sys.executable, str(pathlib.Path(__file__).parent / "myth_runtime.py"), "--run-dir", str(run_dir), "--round", "1"])
+                elif cap == 'entropy':
+                    subprocess.run([sys.executable, str(pathlib.Path(__file__).parent / "maxwells_demon.py"), "--run-dir", str(run_dir)])
 
 if __name__ == "__main__":
     import sys
+    import subprocess
     if len(sys.argv) > 1:
         run_broker(sys.argv[1])
     else:
