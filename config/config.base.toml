@@ -9,7 +9,7 @@ powershell_utf8 = true
 unified_exec = true
 shell_snapshot = true
 
-# Per-machine trust rules belong in configs/config.local.toml (ignored).
+# Per-machine trust rules belong in config/config.local.toml (ignored).
 # Example:
 # [projects.'C:\\path\\to\\repo']
 # trust_level = "trusted"

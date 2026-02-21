@@ -15,7 +15,7 @@ unified_exec = true
 apps = true
 shell_snapshot = true
 
-# Per-machine trust rules belong in configs/config.local.toml (ignored).
+# Per-machine trust rules belong in config/config.local.toml (ignored).
 
 [notice]
 hide_full_access_warning = true

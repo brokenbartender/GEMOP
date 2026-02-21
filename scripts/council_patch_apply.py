@@ -34,7 +34,7 @@ ALLOWED_PREFIXES = (
     "docs/",
     "scripts/",
     "mcp/",
-    "configs/",
+    "config/",
     "agents/templates/",
     "work/",
 )

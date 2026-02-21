@@ -1,0 +1,118 @@
+{
+  "schema_version": 1,
+  "created_at": 1771613910.5981386,
+  "repo_root": "C:\\Users\\codym\\gemini-op-clean",
+  "run_dir": "C:\\Users\\codym\\gemini-op-clean",
+  "task": "test",
+  "pattern": "debate",
+  "agents": 1,
+  "max_rounds": 1,
+  "online": false,
+  "routing": {
+    "cloud_seats": 3,
+    "codex_seats": 0,
+    "max_local_concurrency": 2,
+    "cloud_spillover": false
+  },
+  "budgets": {
+    "quota_cloud_calls": 0,
+    "quota_cloud_calls_per_agent": 0,
+    "contract_repair_attempts": 1
+  },
+  "quality_gates": {
+    "require_decision_json": false,
+    "require_diff_blocks_on_autopatch": false,
+    "verify_after_patches": false,
+    "require_approval": false,
+    "require_grounding": false
+  },
+  "rounds": [
+    {
+      "round": 1,
+      "goal": "Diverge: propose best options with acceptance + key risks.",
+      "required_artifacts": [
+        "round*_agent*.md",
+        "DECISION_JSON(per seat)"
+      ]
+    }
+  ],
+  "service_router": {
+    "schema_version": 1,
+    "online": false,
+    "roles": {
+      "Architect": {
+        "tier": "cloud",
+        "providers": [
+          "cloud_codex_cli",
+          "cloud_gemini",
+          "cloud_gemini_cli"
+        ]
+      },
+      "ResearchLead": {
+        "tier": "cloud",
+        "providers": [
+          "cloud_gemini",
+          "cloud_codex_cli",
+          "cloud_gemini_cli"
+        ]
+      },
+      "Engineer": {
+        "tier": "cloud",
+        "providers": [
+          "cloud_gemini",
+          "cloud_codex_cli",
+          "cloud_gemini_cli"
+        ]
+      },
+      "Security": {
+        "tier": "cloud",
+        "providers": [
+          "cloud_codex_cli",
+          "cloud_gemini",
+          "cloud_gemini_cli"
+        ]
+      },
+      "CodexReviewer": {
+        "tier": "cloud",
+        "providers": [
+          "cloud_codex_cli",
+          "cloud_gemini_cli",
+          "cloud_gemini"
+        ]
+      },
+      "Tester": {
+        "tier": "local",
+        "providers": [
+          "local_ollama"
+        ]
+      },
+      "Critic": {
+        "tier": "local",
+        "providers": [
+          "local_ollama"
+        ]
+      },
+      "Ops": {
+        "tier": "local",
+        "providers": [
+          "local_ollama"
+        ]
+      },
+      "Docs": {
+        "tier": "local",
+        "providers": [
+          "local_ollama"
+        ]
+      },
+      "Release": {
+        "tier": "local",
+        "providers": [
+          "local_ollama"
+        ]
+      }
+    },
+    "fallback": {
+      "tier": "local"
+    }
+  }
+}

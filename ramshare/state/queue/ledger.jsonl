@@ -8,3 +8,9 @@
 {"ts":1771098613.2985814,"job_id":"test-functional-job","state":"leased","details":"profile=research","host":"Work:31256","extra":{"trace_id":"trace-082fa280-1269-40a8-b372-c4681ff44760"}}
 {"ts":1771098613.3138077,"job_id":"test-functional-job","state":"running","details":"task_type=trend_spotter","host":"Work:31256","extra":{"trace_id":"trace-082fa280-1269-40a8-b372-c4681ff44760"}}
 {"ts":1771098613.8421826,"job_id":"test-functional-job","state":"acked","details":"completed","host":"Work:31256","extra":{"trace_id":"trace-082fa280-1269-40a8-b372-c4681ff44760"}}
+{"ts":1771469939.9075177,"job_id":"fidelity-profile-z39213144","state":"queued","details":"path=C:\\Users\\codym\\gemini-op-clean\\ramshare\\evidence\\inbox\\job.fidelity_profile_z39213144.json","host":"Work:24832","extra":{"trace_id":"trace-9f3ea3dd-b9b6-4113-86a7-ff6806c1a031"}}
+{"ts":1771469939.9255521,"job_id":"assistant-job-1771270601449","state":"queued","details":"path=C:\\Users\\codym\\gemini-op-clean\\ramshare\\evidence\\inbox\\temp_job_1771270601449.json","host":"Work:24832","extra":{"trace_id":"trace-d672eb3a-c076-4dc8-9445-fa7b29b01010"}}
+{"ts":1771469939.94107,"job_id":"assistant-job-1771270601449","state":"leased","details":"dry_run","host":"Work:24832","extra":{"trace_id":"trace-d672eb3a-c076-4dc8-9445-fa7b29b01010"}}
+{"ts":1771469940.0000658,"job_id":"fidelity-profile-z39213144","state":"leased","details":"dry_run","host":"Work:24832","extra":{"trace_id":"trace-9f3ea3dd-b9b6-4113-86a7-ff6806c1a031"}}
+{"ts":1771524523.2207413,"job_id":"zero_budget","state":"queued","details":"path=C:\\Users\\codym\\gemini-op-clean\\.agent-jobs\\_heraclean_tmp\\zero_budget.json","host":"Work:7288","extra":{"trace_id":"trace-d520fabb-1412-4532-b5a1-ec46f297537c"}}
+{"ts":1771524523.2484276,"job_id":"zero_budget","state":"leased","details":"dry_run","host":"Work:7288","extra":{"trace_id":"trace-d520fabb-1412-4532-b5a1-ec46f297537c"}}

@@ -1,0 +1,17 @@
+﻿{
+    "updated_at":  "2026-02-20T13:58:30.5024170-05:00",
+    "max_local_concurrency":  2,
+    "created_at":  "2026-02-20T13:58:30.1374596-05:00",
+    "pattern":  "debate",
+    "run_dir":  ".",
+    "cloud_seats":  3,
+    "agent_count":  1,
+    "max_rounds":  1,
+    "rounds":  {
+
+               },
+    "state_version":  1,
+    "requested_max_parallel":  3,
+    "online":  false,
+    "repo_root":  "C:\\Users\\codym\\gemini-op-clean"
+}

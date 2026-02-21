@@ -14,7 +14,7 @@ All factual claims made by agents must be grounded in provided evidence (e.g., f
 
 ## 3. Actionability and Minimality of Changes
 Proposed repo changes (patches) must be actionable, minimal, and high-leverage, as per mission constraints.
-- **Metric**: Manual review of diffs for adherence to file path constraints (`scripts/`, `docs/`, `configs/`, `mcp/`).
+- **Metric**: Manual review of diffs for adherence to file path constraints (`scripts/`, `docs/`, `config/`, `mcp/`).
 - **Failure Mode**: Changes outside allowed directories, excessive modifications, non-unified diffs.
 
 ## 4. Verification Command Efficacy

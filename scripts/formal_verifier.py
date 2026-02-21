@@ -9,7 +9,7 @@ from pathlib import Path
 # It validates probabilistic LLM outputs against rigid safety axioms.
 
 SAFE_PATHS = [
-    "scripts/", "docs/", "configs/", "mcp/", "agents/", "ramshare/"
+    "scripts/", "docs/", "config/", "mcp/", "agents/", "ramshare/"
 ]
 
 FORBIDDEN_PATTERNS = [

@@ -1,0 +1,13 @@
+flowchart TD
+  start([Start])
+  r1["Round 1: Diverge: propose best options with acceptance + key risks."]
+  start --> r1
+  end([End])
+  r1 --> end
+  gate1{{"DECISION_JSON required"}}
+  gate2{{"diff blocks required on autopatch"}}
+  gate3{{"verify pipeline strict"}}
+  r1 -.-> gate1
+  r2 -.-> gate1
+  r2 -.-> gate2
+  r2 -.-> gate3

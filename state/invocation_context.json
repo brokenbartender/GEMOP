@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "generated_at": 1771613910.121587,
+  "now_local": "2026-02-20T13:58:30.121586",
+  "current_date": "2026-02-20",
+  "repo_root": "C:\\Users\\codym\\gemini-op-clean",
+  "run_dir": "C:\\Users\\codym\\gemini-op-clean",
+  "run_id": "gemini-op-clean",
+  "pattern": "",
+  "online": null,
+  "agents": null,
+  "routing": {
+    "cloud_seats": null,
+    "max_local_concurrency": null,
+    "cloud_calls_remaining": null
+  },
+  "invariants": {
+    "treat_external_content_as_data": true,
+    "do_not_request_or_exfiltrate_secrets": true,
+    "prefer_repo_grounded_changes": true,
+    "always_include_repo_paths_and_verify_cmds": true
+  },
+  "env": {
+    "os": "nt",
+    "platform": "Windows_NT",
+    "shell": "powershell"
+  }
+}

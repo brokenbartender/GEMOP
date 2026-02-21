@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Iterable
 
 
-DEFAULT_PREFIXES = ("docs/", "scripts/", "configs/", "mcp/", "agents/templates/")
+DEFAULT_PREFIXES = ("docs/", "scripts/", "config/", "mcp/", "agents/templates/")
 
 
 def _iter_files(repo_root: Path, prefixes: Iterable[str]) -> list[str]:

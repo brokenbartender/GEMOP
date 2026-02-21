@@ -210,7 +210,7 @@ def main() -> int:
     }
 
     payload["sections"].append(
-        {"id": "code", "title": "Code Retriever (scripts/ agents/ mcp/ configs/)", "hits": _rg(query, code_roots, max_count=max_n)}
+        {"id": "code", "title": "Code Retriever (scripts/ agents/ mcp/ config/)", "hits": _rg(query, code_roots, max_count=max_n)}
     )
     payload["sections"].append(
         {"id": "docs", "title": "Docs Retriever (docs/ README GEMINI)", "hits": _rg(query, docs_roots, max_count=max_n)}

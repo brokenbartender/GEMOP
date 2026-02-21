@@ -107,7 +107,7 @@ function Write-PromptFile(
   $lines.Add("- P2: later / nice-to-have") | Out-Null
   $lines.Add("") | Out-Null
   $lines.Add("## Mapping to This Repo") | Out-Null
-  $lines.Add('- profiles: `profiles/config.*.toml`') | Out-Null
+  $lines.Add('- profiles: `config/profiles/config.*.toml`') | Out-Null
   $lines.Add('- daemons: `start-daemons.ps1` and `mcp-daemons/`') | Out-Null
   $lines.Add('- ingestion: `scripts/ingest-and-index.ps1`') | Out-Null
   $lines.Add('- notes: `ramshare/notes/`') | Out-Null

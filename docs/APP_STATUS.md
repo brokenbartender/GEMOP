@@ -29,9 +29,9 @@ It is the single source of truth for the current runtime shape and counts.
 - TUI dashboard: `scripts/tui_dashboard.py` (includes a `DOCS` panel rendering `docs/APP_STATUS.md`)
 
 ## Config
-- Shared profiles: `configs/config.base.toml`, `configs/config.core.toml`, `configs/config.full.toml`, `configs/config.max.toml`
-- Local overrides (ignored): `configs/config.local.toml`
-- Runtime assembled (ignored): `configs/config.active.toml`
+- Shared profiles: `config/config.base.toml`, `config/profiles/config.core.toml`, `config/profiles/config.full.toml`, `config/profiles/config.max.toml`
+- Local overrides (ignored): `config/config.local.toml`
+- Runtime assembled (ignored): `config/config.active.toml`
 
 ## Doc Policy
 - Any functional change must be accompanied by doc updates.

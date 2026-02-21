@@ -1176,7 +1176,7 @@ $pt
           switch ($role) {
             "Architect" { $roleGuidance = "Focus: Process Reimagination. Do not just mirror manual steps; re-architect the workflow to be end-to-end autonomous. Use Python tools to skip intermediate manual UI steps." }
             "ResearchLead" { $roleGuidance = "Focus: Use web_search and fetch to find 'Gold Standard' implementations of identified patterns. Extract must-haves with citations from sources.md. No fake file paths." }
-            "Engineer" { $roleGuidance = "Focus: implement minimal diffs under scripts/docs/configs/mcp. Output diffs that `git apply` will accept (prefer diff --git a/... b/... headers; complete hunks with @@ lines; no prose inside diff fences)." }
+            "Engineer" { $roleGuidance = "Focus: implement minimal diffs under scripts/docs/config/mcp. Output diffs that `git apply` will accept (prefer diff --git a/... b/... headers; complete hunks with @@ lines; no prose inside diff fences)." }
     
       "Tester" { $roleGuidance = "Focus: verification commands and failure modes. Challenge invalid assumptions." }
       "Critic" { $roleGuidance = "Focus: attack hallucinations (invalid file refs, fake citations) and simplify scope." }

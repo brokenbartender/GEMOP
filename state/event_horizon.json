@@ -1,0 +1,28 @@
+{
+  "split_required": false,
+  "split_policy": "binary_star",
+  "mass": 1.0,
+  "mass_breakdown": {
+    "token_mass": 1.0,
+    "keyword_mass": 0.0,
+    "constraint_mass": 0.0,
+    "file_ref_mass": 0.0,
+    "structure_mass": 0.0,
+    "total_mass": 1.0
+  },
+  "physics": {
+    "equation": "r_s = 2GM/c^2",
+    "G": 1.0,
+    "c": 8.0,
+    "r_s": 0.03125,
+    "context_radius_units": 32.0,
+    "context_radius_raw": 4096,
+    "radius_divisor": 128.0,
+    "safety_margin": 31.96875
+  },
+  "estimated_shards": 1,
+  "actual_shards": 0,
+  "shards": [],
+  "prompt_sha256": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+  "ts": 1771613910.3438237
+}

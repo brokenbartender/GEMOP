@@ -134,7 +134,7 @@ foreach ($n in $rawNotes) {
       $lines.Add("- Summary (10 bullets max)") | Out-Null
       $lines.Add("- Actionable controls/checks (prioritized P0/P1/P2)") | Out-Null
       $lines.Add("- Mapping to Gemini-op components:") | Out-Null
-      $lines.Add("  - profiles (`profiles/config.*.toml`)") | Out-Null
+      $lines.Add("  - profiles (`config/profiles/config.*.toml`)") | Out-Null
       $lines.Add("  - MCP daemons (`start-daemons.ps1`)") | Out-Null
       $lines.Add("  - policies/logging/secrets") | Out-Null
       $lines.Add("") | Out-Null

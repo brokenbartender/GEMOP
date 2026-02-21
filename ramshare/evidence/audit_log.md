@@ -81,3 +81,28 @@
 - 2026-02-13T01:55:17-05:00 [HIGH] dispatch job triad-smoke6-control-plane-20260213-judge-job-20260213-015042-d0dbe691 | type=triad_run profile=research est_spend=$0.00
 - 2026-02-14T14:48:55-05:00 [HIGH] dispatch job test-functional-job | type=trend_spotter profile=research est_spend=$0.00
 - 2026-02-14T14:50:13-05:00 [HIGH] dispatch job test-functional-job | type=trend_spotter profile=research est_spend=$0.00
+- 2026-02-18T21:58:59-05:00 [HIGH] dispatch job assistant-job-1771270601449 | type=code_hunter profile=research est_spend=$0.00
+- 2026-02-18T21:58:59-05:00 [HIGH] dispatch job fidelity-profile-z39213144 | type=fidelity_profile profile=fidelity est_spend=$0.00
+- 2026-02-19T13:08:39-05:00 [CRITICAL] BLOCKED (budget): test_spend | est=$0.01
+- 2026-02-19T13:08:43-05:00 [CRITICAL] BLOCKED (approval required): nuke
+- 2026-02-19T13:08:43-05:00 [HIGH] dispatch job zero_budget | type=unknown profile=research est_spend=$0.00
+- 2026-02-19T13:09:33-05:00 [CRITICAL] BLOCKED (budget): test_spend | est=$0.01
+- 2026-02-19T13:09:34-05:00 [CRITICAL] BLOCKED (approval required): nuke
+- 2026-02-19T13:10:07-05:00 [CRITICAL] BLOCKED (budget): test_spend | est=$0.01
+- 2026-02-19T13:10:08-05:00 [CRITICAL] BLOCKED (approval required): nuke
+- 2026-02-19T13:10:46-05:00 [CRITICAL] BLOCKED (budget): test_spend | est=$0.01
+- 2026-02-19T13:10:47-05:00 [CRITICAL] BLOCKED (approval required): nuke
+- 2026-02-19T13:11:25-05:00 [CRITICAL] BLOCKED (budget): test_spend | est=$0.01
+- 2026-02-19T13:11:26-05:00 [CRITICAL] BLOCKED (approval required): nuke
+- 2026-02-19T13:14:44-05:00 [CRITICAL] BLOCKED (budget): summon_council | est=$0.50
+- 2026-02-19T13:16:06-05:00 [CRITICAL] BLOCKED (budget): summon_council | est=$0.50
+- 2026-02-19T13:16:29-05:00 [HIGH] summon_council
+- 2026-02-19T13:27:40-05:00 [CRITICAL] BLOCKED (kill switch): summon_council
+- 2026-02-19T13:27:54-05:00 [CRITICAL] BLOCKED (kill switch): summon_council
+- 2026-02-19T13:28:11-05:00 [CRITICAL] BLOCKED (kill switch): summon_council
+- 2026-02-19T13:28:59-05:00 [CRITICAL] BLOCKED (kill switch): summon_council
+- 2026-02-19T13:29:18-05:00 [CRITICAL] BLOCKED (kill switch): summon_council
+- 2026-02-19T13:29:36-05:00 [CRITICAL] BLOCKED (kill switch): summon_council
+- 2026-02-19T13:30:04-05:00 [CRITICAL] BLOCKED (kill switch): test
+- 2026-02-19T13:31:05-05:00 [CRITICAL] BLOCKED (kill switch): summon_council
+- 2026-02-19T13:32:11-05:00 [HIGH] summon_council

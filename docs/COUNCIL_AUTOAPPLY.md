@@ -116,7 +116,7 @@ Commands:
 Safety rules (enforced by `scripts/council_patch_apply.py`):
 - Rejects “guardrail weakening” diffs (uses the same detection logic as the supervisor).
 - Refuses to patch sensitive paths like `.env`, `gcloud_service_key.json`, and anything under `.git/` or `.agent-jobs/`.
-- Default allowlist: only patches to `docs/`, `scripts/`, `mcp/`, `configs/`, and `agents/templates/` are accepted.
+- Default allowlist: only patches to `docs/`, `scripts/`, `mcp/`, `config/`, and `agents/templates/` are accepted.
 - Runs a lightweight verification step (`python -m compileall scripts mcp`) after applying.
 - Runs a secret scan on the current diff (`python scripts/scan_secrets.py --diff`) when `-VerifyAfterPatches` is enabled.
 

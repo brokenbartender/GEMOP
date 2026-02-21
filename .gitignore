@@ -84,6 +84,6 @@ scripts/vuln_db.json
 *.log
 
 # Keep the shared config profiles versioned, but do not commit local secrets.
-configs/config.local.toml
-configs/secrets.json
-configs/config.active.toml
+config/config.local.toml
+config/secrets.json
+config/config.active.toml
