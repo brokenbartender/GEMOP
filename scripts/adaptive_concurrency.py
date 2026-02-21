@@ -6,6 +6,16 @@ import time
 from pathlib import Path
 from typing import Any
 
+try:
+    import psutil
+except ImportError:
+    psutil = None
+
+def get_cpu_load() -> float:
+    if psutil:
+        return psutil.cpu_percent(interval=1)
+    return 0.0
+
 
 def read_jsonl(path: Path) -> list[dict[str, Any]]:
     if not path.exists():
@@ -74,8 +84,14 @@ def main() -> int:
     max_local = max(1, int(args.current_max_local))
     reasons: list[str] = []
 
+    # --- THERMAL-AWARE THROTTLING ---
+    cpu_load = get_cpu_load()
+    if cpu_load >= 90.0:
+        max_parallel = 1
+        reasons.append(f"CPU_LOAD={cpu_load}% >= 90% -> thermal failsafe throttle to 1")
+
     # Conservative: only reduce based on evidence of slowness/queueing.
-    if w95 >= 30:
+    if w95 >= 30 and max_parallel > 1:
         max_parallel = max(1, max_parallel - 1)
         reasons.append(f"local_slot_wait_p95={w95}>=30s -> reduce max_parallel")
     if d95 >= 240:

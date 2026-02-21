@@ -155,7 +155,7 @@ class MemoryManager:
             # Postgres logic would go here
             pass
 
-    def search_memory(self, query_text=None, query_embedding=None, limit=5, collection_name="agent_history"):
+    def search_memory(self, query_text=None, query_embedding=None, limit=10, collection_name="agent_history"):
         """Semantic search using ChromaDB or Postgres."""
         if self.use_chroma:
             try:

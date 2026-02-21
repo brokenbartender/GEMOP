@@ -1197,14 +1197,35 @@ $pt
       $targetFiles = Build-TargetFileContext -RepoRoot $RepoRoot -RunDir $RunDir -RoundNumber $RoundNumber -AgentId $i -CharBudget 20000
     } catch { $targetFiles = "" }
 
+    # --- BDI & TELEMETRY: Functional Self-Awareness ---
+    $telemetry = ""
+    try {
+        $sm = Join-Path $RepoRoot "scripts\\system_metrics.py"
+        if (Test-Path $sm) {
+            $mem = & python -c "from scripts.system_metrics import memory_info; m=memory_info(); print(f'Avail: {m.avail_mb}MB / Total: {m.total_mb}MB')"
+            $telemetry = "[SYSTEM TELEMETRY]`r`nHost Environment: $mem`r`n"
+        }
+    } catch { }
+
+    $bdiModeling = @"
+ [THEORY OF MIND: BDI MODELING]
+ Before acting, simulate the user's mental state:
+ 1. BELIEF: What does the user believe the current state of the repo is?
+ 2. DESIRE: What is the user's ultimate hidden goal for this session?
+ 3. INTENTION: How does your proposed action align with their desire?
+"@
+    # --- End BDI & Telemetry ---
+
     $body = @"
- $facts$repoIndex$targetFiles$internalState$retrieval$world$sources$skills$darkMatter$taskContract$taskPipeline$anchor$lessons$header
+ $facts$repoIndex$targetFiles$telemetry$internalState$retrieval$world$sources$skills$darkMatter$taskContract$taskPipeline$anchor$lessons$header
  $cap$supervisorMemo$ownerBlock$onto$misinfo$adv$poison
  [OPERATIONAL CONTEXT]
   REPO_ROOT: $RepoRoot
  RUN_DIR: $RunDir
 COUNCIL_PATTERN: $CouncilPattern
 ROUND: $RoundNumber
+
+$bdiModeling
 
 [ROLE]
 You are Agent $i. Role: $role
@@ -2537,6 +2558,22 @@ if ($existingRunnerScripts -and $existingRunnerScripts.Count -gt 0) {
     } catch {
       Write-OrchLog -RunDir $RunDir -Msg ("world_state_rebuild_failed round={0} error={1}" -f $r, $_.Exception.Message)
     }
+
+    # --- AGI & ALIGNMENT: Dynamic Evolution ---
+    try {
+      $broker = Join-Path $RepoRoot "scripts\\agent_capability_broker.py"
+      if (Test-Path $broker) {
+        Write-Log "[AGI] Scanning for new capability requests..."
+        & python $broker $RunDir | Out-Null
+      }
+      
+      $gyro = Join-Path $RepoRoot "scripts\\gyro_context.py"
+      if (Test-Path $gyro) {
+        Write-Log "[Gyro] Stabilizing context rotation..."
+        & python $gyro --run-dir $RunDir | Out-Null
+      }
+    } catch { }
+    # --- End Dynamic Evolution ---
 
     # --- NEW: MEM1 State Consolidation ---
     try {

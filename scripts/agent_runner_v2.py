@@ -1360,11 +1360,11 @@ def run_agent(prompt_path, out_md, fallback_model=None):
                     query_text = prompt[-2000:]
                 
                 # Layer 1: User Interactions (High alignment priority)
-                user_memories = mem_mgr.search_memory(query_text=query_text, limit=2, collection_name="user_interactions")
+                user_memories = mem_mgr.search_memory(query_text=query_text, limit=5, collection_name="user_interactions")
                 # Layer 2: Agent History (Procedural knowledge)
-                agent_memories = mem_mgr.search_memory(query_text=query_text, limit=2, collection_name="agent_history")
+                agent_memories = mem_mgr.search_memory(query_text=query_text, limit=5, collection_name="agent_history")
                 # Layer 3: Project Data (Grounding/Docs)
-                project_data = mem_mgr.search_memory(query_text=query_text, limit=2, collection_name="project_data")
+                project_data = mem_mgr.search_memory(query_text=query_text, limit=5, collection_name="project_data")
                 
                 # --- NEW: PROACTIVE PEER REVIEW (TRUE PARTNER PATTERN) ---
                 peer_context = ""
@@ -1512,7 +1512,7 @@ Output your reasoning in a > block before your main response.
             "edge": {
                 "gemini": (os.environ.get("GEMINI_OP_MODEL_EDGE_GEMINI") or "gemini-2.0-flash").strip(),
                 "codex": (os.environ.get("GEMINI_OP_MODEL_EDGE_CODEX") or "gpt-4o-mini").strip(),
-                "local": (os.environ.get("GEMINI_OP_MODEL_EDGE_LOCAL") or "phi4:latest").strip()
+                "local": (os.environ.get("GEMINI_OP_MODEL_EDGE_LOCAL") or "phi3:mini").strip()
             }
         }
         
